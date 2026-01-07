@@ -3,7 +3,7 @@ from app.db.base_class import Base
 import enum
 
 class UserRole(str, enum.Enum):
-    ADMIN = "ADMIN"
+    ADMIN = "admin"
     TEACHER = "teacher"
     THERAPIST = "therapist"
 

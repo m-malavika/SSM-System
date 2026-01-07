@@ -1,7 +1,7 @@
 """merge_heads
 
 Revision ID: a65fb55baae5
-Revises: 54d022a28929, add_documents_column
+Revises: 54d022a28929
 Create Date: 2025-11-20 22:46:18.105243
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'a65fb55baae5'
-down_revision: Union[str, None] = ('54d022a28929', 'add_documents_column')
+down_revision: Union[str, None] = '54d022a28929'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
