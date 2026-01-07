@@ -102,6 +102,75 @@ def create_student(
             )
     return crud_student.create(db=db, obj_in=student_in)
 
+@router.post("/upload-report")
+async def upload_report_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Upload a student report image and extract table data using OCR.
+    
+    Args:
+        file: Image file containing a table (JPG, PNG, etc.)
+        
+    Returns:
+        JSON with extracted table data
+    """
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/bmp", "image/tiff"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
+        )
+    
+    # Read file bytes
+    try:
+        file_bytes = await file.read()
+        
+        # Check file size (max 10MB)
+        if len(file_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
+    
+    # Extract table data using OCR
+    try:
+        from app.utils.ocr_service import ocr_service
+        
+        result = ocr_service.extract_table_from_image(file_bytes)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"OCR processing failed: {result.get('error', 'Unknown error')}"
+            )
+        
+        if result["table_count"] == 0:
+            return {
+                "success": True,
+                "message": "No tables detected in the image",
+                "tables": [],
+                "method": result.get("method")
+            }
+        
+        return {
+            "success": True,
+            "message": f"Successfully extracted {result['table_count']} table(s)",
+            "tables": result["tables"],
+            "method": result["method"],
+            "filename": file.filename
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"OCR processing error: {str(e)}"
+        )
+
 @router.put("/{student_id}/case-record", response_model=Student)
 def upsert_case_record(
     student_id: int,
@@ -415,73 +484,3 @@ def delete_student_document(
         "message": "Document deleted successfully",
         "document_name": deleted_doc_name
     }
-
-
-@router.post("/upload-report")
-async def upload_report_image(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    Upload a student report image and extract table data using OCR.
-    
-    Args:
-        file: Image file containing a table (JPG, PNG, etc.)
-        
-    Returns:
-        JSON with extracted table data
-    """
-    # Validate file type
-    allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/bmp", "image/tiff"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
-        )
-    
-    # Read file bytes
-    try:
-        file_bytes = await file.read()
-        
-        # Check file size (max 10MB)
-        if len(file_bytes) > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
-        
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
-    
-    # Extract table data using OCR
-    try:
-        from app.utils.ocr_service import ocr_service
-        
-        result = ocr_service.extract_table_from_image(file_bytes)
-        
-        if not result["success"]:
-            raise HTTPException(
-                status_code=500,
-                detail=f"OCR processing failed: {result.get('error', 'Unknown error')}"
-            )
-        
-        if result["table_count"] == 0:
-            return {
-                "success": True,
-                "message": "No tables detected in the image",
-                "tables": [],
-                "method": result.get("method")
-            }
-        
-        return {
-            "success": True,
-            "message": f"Successfully extracted {result['table_count']} table(s)",
-            "tables": result["tables"],
-            "method": result["method"],
-            "filename": file.filename
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"OCR processing error: {str(e)}"
-        )
