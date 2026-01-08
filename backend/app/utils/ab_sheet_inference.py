@@ -123,13 +123,13 @@ def _crop_table_region(image_bgr: np.ndarray) -> np.ndarray:
 def _split_into_cells(table_bgr: np.ndarray) -> List[List[np.ndarray]]:
     """
     Uniformly split cropped table into N_ROWS x N_COLS cells.
-    - First trim so height/width are divisible by N_ROWS/N_COLS.
-    - Then, for each cell, crop a bit inside the borders so we avoid
-      grid lines and row/column numbers.
+    - Trim so height/width are divisible by N_ROWS/N_COLS.
+    - Then take a centered band inside each cell so we avoid
+      both top and bottom grid lines and keep the middle where A/B sits.
     """
     h, w = table_bgr.shape[:2]
 
-    # Trim height to be divisible by N_ROWS
+    # ---- keep your existing trim code here (extra_h / extra_w) ----
     extra_h = h % N_ROWS
     if extra_h != 0:
         trim_top = extra_h // 2
@@ -137,42 +137,51 @@ def _split_into_cells(table_bgr: np.ndarray) -> List[List[np.ndarray]]:
         table_bgr = table_bgr[trim_top:h - trim_bottom, :]
         h = table_bgr.shape[0]
 
-    # Trim width to be divisible by N_COLS
     extra_w = w % N_COLS
     if extra_w != 0:
         trim_left = extra_w // 2
         trim_right = extra_w - trim_left
         table_bgr = table_bgr[:, trim_left:w - trim_right]
         w = table_bgr.shape[1]
+    # ---- end trim code ----
 
     cell_h = h // N_ROWS
     cell_w = w // N_COLS
 
-    # How much to crop inside each cell (as a fraction of height/width)
-    MARGIN_Y = 0.15   # 15% from top and bottom
-    MARGIN_X = 0.15   # 15% from left and right
+    # Take central 60% vertically and 60% horizontally
+    CENTER_H_FRAC = 0.60
+    CENTER_W_FRAC = 0.60
 
     cells: List[List[np.ndarray]] = []
     for r in range(N_ROWS):
         row_cells = []
         for c in range(N_COLS):
-            # outer cell bounds
             y1 = r * cell_h
             y2 = (r + 1) * cell_h
             x1 = c * cell_w
             x2 = (c + 1) * cell_w
 
-            # crop inside the cell to remove grid lines / numbers
             h_cell = y2 - y1
             w_cell = x2 - x1
-            inner_y1 = y1 + int(h_cell * MARGIN_Y)
-            inner_y2 = y2 - int(h_cell * MARGIN_Y)
-            inner_x1 = x1 + int(w_cell * MARGIN_X)
-            inner_x2 = x2 - int(w_cell * MARGIN_X)
-
+    
+            # Vertical band: 70% of height, shifted UP (towards top)
+            CENTER_H_FRAC = 0.70
+            CENTER_H_OFFSET = 0.40   # center at 40% from top (not 50%)
+    
+            band_h = int(h_cell * CENTER_H_FRAC)
+            cy = y1 + int(h_cell * CENTER_H_OFFSET)
+            inner_y1 = max(y1, cy - band_h // 2)
+            inner_y2 = min(y2, cy + band_h // 2)
+    
+            # Horizontal band: 60% of width around center
+            CENTER_W_FRAC = 0.60
+            band_w = int(w_cell * CENTER_W_FRAC)
+            cx = x1 + w_cell // 2
+            inner_x1 = max(x1, cx - band_w // 2)
+            inner_x2 = min(x2, cx + band_w // 2)
+    
             cell = table_bgr[inner_y1:inner_y2, inner_x1:inner_x2]
 
-            # (optional) debug save:
             debug_path = os.path.join(
                 DEBUG_CELLS_DIR,
                 f"row{r+1:02d}_col{c+1:02d}.png",
@@ -202,7 +211,7 @@ def _predict_cell_label(model, cell_bgr: np.ndarray) -> str:
         x = _preprocess_cell(cell_bgr)
         logit = model(x)          # shape [1,1]
         prob_b = torch.sigmoid(logit)[0].item()
-    return "B" if prob_b >= 0.6 else "A"
+    return "B" if prob_b >= 0.4 else "A"
 
 
 # ====== MAIN ENTRY POINT (replaces Paddle-based extract_table_from_image) ======
