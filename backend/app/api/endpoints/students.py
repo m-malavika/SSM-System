@@ -135,11 +135,11 @@ async def upload_report_image(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
     
-    # Extract table data using OCR
+    # Extract table data using CNN-based A/B classifier instead of PaddleOCR
     try:
-        from app.utils.ocr_service import ocr_service
-        
-        result = ocr_service.extract_table_from_image(file_bytes)
+        from app.utils.ab_sheet_inference import predict_ab_table_from_image
+
+        result = predict_ab_table_from_image(file_bytes)
         
         if not result["success"]:
             raise HTTPException(
