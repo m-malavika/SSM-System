@@ -23,10 +23,10 @@ class TherapyAISummaryRequest(BaseModel):
     from_date: Optional[date] = None
     to_date: Optional[date] = None
     therapy_type: Optional[str] = None
-    model: Optional[str] = "facebook/bart-large-cnn"
-    text_gen_model: Optional[str] = "microsoft/DialoGPT-medium"  # For enhanced current status analysis
-    max_length: int = 280
-    min_length: int = 60
+    model: Optional[str] = "meta-llama/Llama-3.2-3B-Instruct"  # Upgraded to Llama for better grammar
+    text_gen_model: Optional[str] = "meta-llama/Llama-3.2-3B-Instruct"  # For enhanced current status analysis
+    max_length: int = 500
+    min_length: int = 100
     use_text_generation: bool = True  # Enable advanced text generation for current status
 
 
@@ -83,6 +83,50 @@ def list_reports_for_student(
     """List therapy reports for a student."""
     # Authorization can be added (e.g., only teacher or admin)
     return crud.therapy_report.get_by_student(db, student_id=student_id)
+
+
+@router.post("/summary/ai/test", response_model=TherapyAISummaryResponse)
+def ai_summarize_reports_test(
+    payload: TherapyAISummaryRequest = Body(...),
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """TEST ENDPOINT - Generate AI analysis WITHOUT authentication (for testing only).
+    
+    WARNING: This endpoint bypasses authentication. Remove in production!
+    Use this only for testing the AI summarization functionality.
+    """
+    if InferenceClient is None:
+        raise HTTPException(status_code=503, detail="huggingface_hub not installed on server.")
+
+    if not settings.HUGGINGFACE_API_TOKEN:
+        raise HTTPException(status_code=503, detail="HUGGINGFACE_API_TOKEN environment variable not set on server.")
+
+    from app.crud.student import student as crud_student
+    db_student = crud_student.get_by_student_id(db, student_id=payload.student_id)
+    if not db_student:
+        raise HTTPException(status_code=404, detail=f"Student with ID {payload.student_id} not found.")
+    
+    reports = crud.therapy_report.get_by_student(db, student_id=db_student.id)
+    if not reports:
+        raise HTTPException(status_code=404, detail="No therapy reports found for student.")
+
+    # Filter by date range / therapy type
+    filtered = []
+    for r in reports:
+        if payload.from_date and r.report_date < payload.from_date:
+            continue
+        if payload.to_date and r.report_date > payload.to_date:
+            continue
+        if payload.therapy_type and (not r.therapy_type or r.therapy_type != payload.therapy_type):
+            continue
+        filtered.append(r)
+
+    if not filtered:
+        raise HTTPException(status_code=404, detail="No therapy reports matched the provided filters.")
+
+    filtered.sort(key=lambda r: r.report_date)
+    analysis = _generate_comprehensive_analysis(filtered, db_student, payload)
+    return analysis
 
 
 @router.post("/summary/ai", response_model=TherapyAISummaryResponse)
@@ -162,47 +206,47 @@ def _generate_comprehensive_analysis(reports, student, payload):
         # Generate AI analysis for different sections using actual report content
         
         # 1. Brief Overview - AI analyzes all reports for general progress
-        overview_prompt = _build_overview_prompt(reports, student)
-        overview_result = client.summarization(
-            overview_prompt[:8000],  # Limit size for API
-            model=payload.model or "facebook/bart-large-cnn"
+        overview_prompt = _build_overview_prompt_with_fewshot(reports, student)
+        overview_result = client.chat_completion(
+            messages=[{"role": "user", "content": overview_prompt}],
+            model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
+            max_tokens=300,
+            temperature=0.7
         )
-        brief_overview = _extract_summary_text(overview_result)
+        brief_overview = _extract_generated_text(overview_result)
         
         # 2. Start Date Analysis - AI analyzes initial reports
-        start_prompt = _build_start_analysis_prompt(start_reports, student)
-        start_result = client.summarization(
-            start_prompt[:6000],
-            model=payload.model or "facebook/bart-large-cnn"
+        start_prompt = _build_start_analysis_prompt_with_fewshot(start_reports, student)
+        start_result = client.chat_completion(
+            messages=[{"role": "user", "content": start_prompt}],
+            model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
+            max_tokens=350,
+            temperature=0.7
         )
-        start_analysis = _extract_summary_text(start_result)
+        start_analysis = _extract_generated_text(start_result)
         
         # 3. Current Status Analysis - Enhanced with text generation for detailed insights
-        if payload.use_text_generation:
-            end_analysis = _generate_enhanced_current_status(client, end_reports, student, payload)
-        else:
-            end_prompt = _build_end_analysis_prompt(end_reports, student)
-            end_result = client.summarization(
-                end_prompt[:6000],
-                model=payload.model or "facebook/bart-large-cnn"
-            )
-            end_analysis = _extract_summary_text(end_result)
+        end_analysis = _generate_enhanced_current_status_llama(client, end_reports, student, payload)
         
         # 4. Recommendations - AI generates based on progress patterns
-        recommendations_prompt = _build_recommendations_prompt(reports, improvement_metrics, student)
-        rec_result = client.summarization(
-            recommendations_prompt[:6000],
-            model=payload.model or "facebook/bart-large-cnn"
+        recommendations_prompt = _build_recommendations_prompt_with_fewshot(reports, improvement_metrics, student)
+        rec_result = client.chat_completion(
+            messages=[{"role": "user", "content": recommendations_prompt}],
+            model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
+            max_tokens=400,
+            temperature=0.7
         )
-        recommendations = _extract_summary_text(rec_result)
+        recommendations = _extract_generated_text(rec_result)
         
         # 5. Main Summary - AI analyzes all report content
-        main_summary_prompt = _build_main_summary_prompt(reports, student)
-        main_result = client.summarization(
-            main_summary_prompt[:10000],
-            model=payload.model or "facebook/bart-large-cnn"
+        main_summary_prompt = _build_main_summary_prompt_with_fewshot(reports, student)
+        main_result = client.chat_completion(
+            messages=[{"role": "user", "content": main_summary_prompt}],
+            model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
+            max_tokens=450,
+            temperature=0.7
         )
-        main_summary = _extract_summary_text(main_result)
+        main_summary = _extract_generated_text(main_result)
         
     except Exception as e:
         logging.exception("AI analysis failed, using fallback")
@@ -211,7 +255,7 @@ def _generate_comprehensive_analysis(reports, student, payload):
     
     return TherapyAISummaryResponse(
         student_id=payload.student_id,
-        model=payload.model or "facebook/bart-large-cnn",
+        model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
         used_reports=len(reports),
         truncated=False,
         summary=main_summary,
@@ -230,6 +274,21 @@ def _extract_summary_text(result):
         return result["summary_text"].strip()
     else:
         return str(result)[:800]  # Limit length
+
+
+def _extract_generated_text(result):
+    """Extract generated text from Llama text generation result."""
+    if isinstance(result, str):
+        return result.strip()
+    elif hasattr(result, 'choices') and len(result.choices) > 0:
+        # Chat completion response
+        return result.choices[0].message.content.strip()
+    elif isinstance(result, dict):
+        if "generated_text" in result:
+            return result["generated_text"].strip()
+        elif "text" in result:
+            return result["text"].strip()
+    return str(result)[:1000]
 
 
 def _build_overview_prompt(reports, student):
@@ -841,3 +900,389 @@ def _generate_fallback_analysis(reports, student, payload, metrics, date_range):
         recommendations=recommendations,
         date_range=date_range
     )
+
+# ============================================================================
+# FEW-SHOT PROMPT BUILDERS WITH PROFESSIONAL EXAMPLES
+# ============================================================================
+
+def _extract_section_titles(reports):
+    """Extract unique section titles from therapy reports' goals_achieved field."""
+    section_titles = set()
+    
+    for report in reports:
+        if report.goals_achieved:
+            # If goals_achieved is a dict, get the keys (section titles)
+            if isinstance(report.goals_achieved, dict):
+                section_titles.update(report.goals_achieved.keys())
+            # If it's a string, try to parse common section patterns
+            elif isinstance(report.goals_achieved, str):
+                # Look for common patterns like "Section Name:" or "**Section Name**"
+                import re
+                # Match patterns like "Word Word:" at start of line
+                # Updated to handle: "Receptive Language:", "Oral Motor and OPT:", etc.
+                matches = re.findall(r'^([A-Z][A-Za-z\s&(),]+(?:\s+and\s+[A-Z]+)?[A-Za-z\s]*):', report.goals_achieved, re.MULTILINE)
+                # Clean up matches (strip trailing spaces)
+                section_titles.update([m.strip() for m in matches if m.strip()])
+    
+    # Return as sorted list for consistency
+    return sorted(list(section_titles)) if section_titles else []
+
+
+def _extract_section_content(report, section_name):
+    """Extract content for a specific section from a report - ONLY from matching section."""
+    if not report.goals_achieved:
+        return ""
+    
+    # If goals_achieved is a dict
+    if isinstance(report.goals_achieved, dict):
+        content = report.goals_achieved.get(section_name, "")
+        if not content:
+            return ""
+        if isinstance(content, dict):
+            # If the value is a dict with 'notes' or similar
+            return str(content.get('notes', content.get('text', str(content))))[:300]
+        return str(content)[:300]
+    
+    # If goals_achieved is a string, try to extract the section
+    if isinstance(report.goals_achieved, str):
+        import re
+        # Try to find the section and extract text until next section or end
+        # More precise pattern to match section titles with "and" phrases
+        pattern = rf"^{re.escape(section_name)}:\s*(.*?)(?=\n[A-Z][A-Za-z\s&(),]+(?:\s+and\s+[A-Z]+)?[A-Za-z\s]*:|$)"
+        match = re.search(pattern, report.goals_achieved, re.DOTALL | re.MULTILINE)
+        if match:
+            return match.group(1).strip()[:300]
+    
+    # NO fallback to progress_notes - only return content from matching section
+    return ""
+
+
+# ============================================================================
+# FEW-SHOT PROMPT BUILDERS WITH PROFESSIONAL EXAMPLES
+# ============================================================================
+
+def _build_overview_prompt_with_fewshot(reports, student):
+    """Build overview prompt with few-shot examples for better quality output."""
+    student_name = getattr(student, 'name', 'Student')
+    
+    # Extract actual section titles from goals_achieved field
+    section_titles = _extract_section_titles(reports)
+    
+    # Few-shot examples matching the desired format
+    prompt = """You are a clinical report summarization assistant for SPEECH THERAPY.
+
+Generate a PROGRESS SUMMARY that consolidates multiple therapy sessions into one coherent report.
+
+CRITICAL RULES:
+- Use ONLY the exact section titles provided from the actual reports
+- Do NOT invent, rename, or merge section titles
+- Do NOT add sections that are not in the provided list
+- Standard speech therapy sections: Receptive Language, Expressive Language, Oral Motor and OPT, Pragmatic Language, Narrative Skills
+- NO dates, NO session numbers, NO "Session 1/2/3"
+- NO Social-Emotional, Cognitive, or ADL sections unless explicitly in the reports
+- STOP after completing all provided sections - do not add extra sections
+
+WRITING REQUIREMENTS:
+- For each section (Receptive, Expressive, Oral Motor, Pragmatic, Narrative), write 2-3 COMPLETE sentences describing current abilities and progress toward therapy goals
+- Use formal, professional language suitable for a clinical report
+- Highlight skills that have improved, are emerging, or need minimal support
+- Avoid repeating the therapy goals themselves - focus on what the child CAN DO now
+- Use consistent sentence starters with the child's name: "{student_name} demonstrates...", "{student_name} constructs...", "{student_name} shows..."
+- For narrative and expressive sections, include higher-level descriptors like "uses transition words," "sequencing skills improving," "story comprehension developing"
+- Each section MUST be at least 2-3 sentences to ensure a complete professional summary
+- Use ONLY information from the reports - do NOT include details not mentioned (like age, grade, etc.)
+- Avoid one-line bullet points or incomplete statements
+- Use present tense for current abilities ("demonstrates", "shows", "can")
+- Describe progress using phrases like "has improved", "is emerging", "needs support", "responds with moderate prompts"
+
+EXAMPLE FORMAT:
+
+PROGRESS SUMMARY
+During therapy sessions, the child showed consistent participation and steady progress toward goals.
+
+Receptive Language:
+The child successfully follows three-step commands independently in most opportunities. Comprehension of prepositions has become consistent in structured activities. Understanding of pronouns is emerging and responds correctly with moderate prompts.
+
+Expressive Language:
+The child constructs 4-5 word utterances spontaneously and with minimal cues. Expresses needs appropriately and vocabulary has expanded to include descriptive words and basic verbs.
+
+Oral Motor and OPT:
+The child demonstrates improved oral motor control with reduced drooling. Chewing patterns show progress with harder textures. Tongue lateralization is emerging with verbal cues.
+
+Pragmatic Language:
+The child maintains eye contact during interactions and responds appropriately to greetings. Turn-taking skills have improved in structured play activities. Social initiation is emerging with adult support.
+
+Narrative Skills:
+The child sequences 2-3 picture cards with moderate verbal prompts. Retells simple stories using key vocabulary provided. Understanding of story elements is developing with visual supports.
+
+NOW GENERATE FOR THIS STUDENT:
+"""
+    
+    # Add actual student data with section-by-section breakdown
+    prompt += f"\nStudent Name: {student_name}\n"
+    prompt += f"Total Sessions: {len(reports)}\n"
+    
+    # If we found section titles, list them
+    if section_titles:
+        prompt += f"\nSection Titles to Use (EXACTLY as written):\n"
+        for title in section_titles:
+            prompt += f"  - {title}\n"
+    
+    # Provide session data organized by sections
+    prompt += f"\nSession Data by Section:\n"
+    for section in section_titles if section_titles else ["General Progress"]:
+        prompt += f"\n{section}:\n"
+        
+        # Extract notes related to this section from early and recent sessions
+        early_notes = []
+        recent_notes = []
+        
+        for report in reports[:min(3, len(reports))]:  # Early sessions
+            note = _extract_section_content(report, section)
+            if note:
+                early_notes.append(note)
+        
+        for report in reports[-min(3, len(reports)):]:  # Recent sessions
+            note = _extract_section_content(report, section)
+            if note:
+                recent_notes.append(note)
+        
+        if early_notes:
+            prompt += f"  Early sessions: {' '.join(early_notes[:2])}\n"
+        if recent_notes:
+            prompt += f"  Recent sessions: {' '.join(recent_notes[:2])}\n"
+    
+    prompt += f"\nGenerate a consolidated PROGRESS SUMMARY using the exact section titles listed above. Start with 'PROGRESS SUMMARY' as the heading, then list each section with a description of the child's current abilities and progress:\n"
+    
+    return prompt
+
+
+def _build_start_analysis_prompt_with_fewshot(start_reports, student):
+    """Build start analysis prompt with few-shot examples."""
+    student_name = getattr(student, 'name', 'Student')
+    
+    prompt = """You are a clinical report summarization assistant.
+
+Your role is to analyze initial therapy sessions and describe the baseline status.
+
+Rules:
+- Do NOT invent new section titles.
+- Do NOT rename or merge section titles.
+- Use ONLY the section titles exactly as they appear in the input reports.
+- Maintain professional, therapist-friendly language.
+- Describe the child's initial condition and challenges.
+- Do not include dates, scores, or session-by-session repetition.
+
+EXAMPLE 1:
+Input: Alex, initial sessions showed poor motor skills, difficulty with pencil grip, reluctant to participate
+Output: At the start of therapy, Alex presented with challenges in fine motor coordination. Pencil grip was inconsistent and required frequent correction. Hand strength appeared limited, affecting precise movements. Alex showed reluctance to engage in structured fine motor activities and needed significant encouragement to participate.
+
+EXAMPLE 2:
+Input: Maria, early sessions: poor articulation, shy, limited vocabulary, difficulty with 's' and 'th' sounds
+Output: Initial sessions revealed articulation difficulties, particularly with 's' and 'th' sounds. Expressive vocabulary was limited compared to age expectations. Maria exhibited shyness that impacted her willingness to verbalize. She required substantial prompting to produce connected speech and often responded with single words rather than complete sentences.
+
+NOW ANALYZE THIS STUDENT'S BASELINE:
+"""
+    
+    prompt += f"Student Name: {student_name}\n"
+    prompt += f"Initial Assessment Period: {len(start_reports)} early sessions\n\n"
+    
+    prompt += "Early Session Notes (actual baseline data):\n"
+    for i, report in enumerate(start_reports, 1):
+        if report.progress_notes:
+            prompt += f"- {report.progress_notes[:200]}\n"
+        if report.goals_achieved:
+            goals_text = str(report.goals_achieved)[:150]
+            prompt += f"  Goals: {goals_text}\n"
+    
+    prompt += f"\nDescribe {student_name}'s initial baseline condition based on the early session notes above:\n"
+    
+    return prompt
+
+
+def _generate_enhanced_current_status_llama(client, end_reports, student, payload):
+    """Generate current status using Llama with few-shot examples."""
+    student_name = getattr(student, 'name', 'Student')
+    
+    prompt = """You are a clinical report summarization assistant.
+
+Your role is to describe the child's current abilities and status based on recent sessions.
+
+Rules:
+- Do NOT invent new section titles.
+- Do NOT rename or merge section titles.
+- Use ONLY the section titles exactly as they appear in the input reports.
+- Maintain professional, therapist-friendly language.
+- Describe current abilities and functioning level.
+- Do not include dates, scores, or session-by-session repetition.
+
+EXAMPLE 1:
+Input: Michael, recent sessions show confident speaking, leads discussions, clear articulation
+Output: Michael now demonstrates confident verbal communication. He initiates conversations independently and actively participates in group discussions. Articulation is clear and consistent across all previously targeted sounds. He requires minimal prompting to elaborate on responses and maintains topic relevance throughout conversations.
+
+EXAMPLE 2:
+Input: Emma, recent sessions show independent cutting, neat handwriting, proper pencil grip
+Output: Emma currently exhibits age-appropriate fine motor skills. She completes cutting tasks independently with good precision along both straight and curved lines. Pencil grip is consistently appropriate without reminders. Handwriting is legible and properly sized. She demonstrates the hand strength and coordination needed for classroom activities.
+
+NOW ANALYZE THIS STUDENT'S CURRENT STATUS:
+"""
+    
+    prompt += f"Student Name: {student_name}\n"
+    prompt += f"Analysis Period: {len(end_reports)} most recent sessions\n\n"
+    
+    prompt += "Recent Session Notes (current status data):\n"
+    for report in end_reports:
+        if report.progress_notes:
+            prompt += f"- {report.progress_notes[:200]}\n"
+        if report.goals_achieved:
+            goals_text = str(report.goals_achieved)[:150]
+            prompt += f"  Achievements: {goals_text}\n"
+    
+    prompt += f"\nDescribe {student_name}'s current abilities and functioning level based on recent sessions:\n"
+    
+    try:
+        messages = [{"role": "user", "content": prompt}]
+        result = client.chat_completion(
+            messages=messages,
+            model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
+            max_tokens=350,
+            temperature=0.7
+        )
+        return _extract_generated_text(result)
+    except Exception as e:
+        logging.warning(f"Llama current status failed: {e}, using fallback")
+        return _build_basic_current_status(end_reports, student)
+
+
+def _build_recommendations_prompt_with_fewshot(reports, metrics, student):
+    """Build recommendations prompt with few-shot examples."""
+    student_name = getattr(student, 'name', 'Student')
+    
+    prompt = """You are a clinical report summarization assistant.
+
+Your role is to provide professional recommendations based on the child's therapy progress.
+
+Rules:
+- Maintain professional, therapist-friendly language.
+- Provide specific, actionable recommendations.
+- Do not include dates, scores, or session numbers.
+- Focus on next steps and future planning.
+
+EXAMPLE 1:
+Input: Student progressed significantly, now meeting age expectations, ready for mainstream
+Output: The child has achieved the therapeutic goals and demonstrates skills appropriate for age level. Consider transitioning to classroom-based support with monitoring rather than direct therapy. A follow-up evaluation in several months would help ensure skill maintenance. The family may benefit from home strategies to continue reinforcing progress.
+
+EXAMPLE 2:
+Input: Student shows progress but needs continued support in specific areas
+Output: Continued therapy is recommended to build upon current gains. Increasing session frequency may accelerate progress in remaining challenge areas. Implementing home practice activities in collaboration with the family would reinforce skills between sessions. Focus should remain on advancing expressive language and social communication skills.
+
+NOW GENERATE RECOMMENDATIONS FOR:
+"""
+    
+    prompt += f"Student Name: {student_name}\n"
+    prompt += f"Total Sessions Completed: {len(reports)}\n"
+    
+    # Add early to later progression narrative
+    if len(reports) >= 2:
+        prompt += f"\nEarly Sessions Context:\n"
+        for report in reports[:min(2, len(reports))]:
+            if report.progress_notes:
+                prompt += f"- {report.progress_notes[:150]}\n"
+        
+        prompt += f"\nRecent Sessions Context:\n"
+        for report in reports[-min(2, len(reports)):]:
+            if report.progress_notes:
+                prompt += f"- {report.progress_notes[:150]}\n"
+    
+    prompt += f"\nGenerate professional recommendations for {student_name} based on the progress shown:\n"
+    
+    return prompt
+
+
+def _build_main_summary_prompt_with_fewshot(reports, student):
+    """Build main summary prompt with section-based format."""
+    student_name = getattr(student, 'name', 'Student')
+    
+    # Extract actual section titles
+    section_titles = _extract_section_titles(reports)
+    
+    prompt = """You are a clinical report summarization assistant for SPEECH THERAPY.
+
+Generate a comprehensive PROGRESS SUMMARY in the same format as the overview.
+
+CRITICAL RULES:
+- Use ONLY the exact section titles provided from the actual reports
+- Do NOT add sections that are not in the provided list
+- Standard speech therapy sections: Receptive Language, Expressive Language, Oral Motor and OPT, Pragmatic Language, Narrative Skills
+- Start with "PROGRESS SUMMARY" heading
+- Each section's content must come ONLY from that exact section in the reports
+- NO dates, NO session numbers
+- NO Social-Emotional, Cognitive, or ADL sections unless explicitly in the reports
+- STOP after completing all provided sections
+
+WRITING REQUIREMENTS:
+- For each section (Receptive, Expressive, Oral Motor, Pragmatic, Narrative), write 2-3 COMPLETE sentences describing current abilities and how they progressed
+- Use formal, professional language suitable for a clinical report
+- Highlight skills that have improved, are emerging, or need minimal support
+- Avoid repeating the therapy goals themselves - describe what the child accomplishes now
+- Use consistent sentence starters with the child's name: "{student_name} demonstrates...", "{student_name} constructs...", "{student_name} shows..."
+- For narrative and expressive sections, include higher-level descriptors like "uses transition words," "sequencing skills improving," "story comprehension age-appropriate with emerging inferencing"
+- Each section MUST be at least 2-3 sentences to ensure a complete professional summary
+- Use ONLY information from the reports - do NOT include details not mentioned (like age, grade, etc.)
+- Avoid one-line bullet points or incomplete statements
+- Use present tense ("demonstrates", "shows", "can")
+- Describe progress using phrases like "has improved", "is emerging", "needs support", "responds with minimal/moderate cues"
+
+EXAMPLE FORMAT:
+
+PROGRESS SUMMARY
+During therapy sessions, the child demonstrated consistent engagement and progress toward therapeutic goals.
+
+Receptive Language:
+The child successfully follows multi-step commands independently. Comprehension of spatial concepts has become reliable across contexts. Understanding of complex sentences is emerging with visual and verbal support.
+
+Expressive Language:
+The child constructs age-appropriate sentences spontaneously. Vocabulary has expanded to include descriptive words and action verbs. Requests needs and communicates wants with clarity.
+
+Oral Motor and OPT:
+The child shows improved lip closure during swallowing. Tongue strength has increased with sustained exercises. Oral awareness is developing through sensory activities.
+
+Pragmatic Language:
+The child initiates conversations with familiar adults and peers. Maintains topic relevance with minimal redirection. Understanding of nonverbal cues is improving in social contexts.
+
+Narrative Skills:
+The child retells familiar stories with key details and correct sequence. Uses transition words when describing events. Story comprehension is age-appropriate with higher-level inferencing emerging.
+
+NOW GENERATE FOR THIS STUDENT:
+"""
+    
+    prompt += f"Student Name: {student_name}\n"
+    prompt += f"Total Sessions: {len(reports)}\n"
+    
+    # List the exact section titles to use
+    if section_titles:
+        prompt += f"\nSection Titles to Use (EXACTLY as written):\n"
+        for title in section_titles:
+            prompt += f"  - {title}\n"
+    
+    # Provide data for each section showing progression
+    prompt += f"\nSession Data by Section:\n"
+    for section in section_titles if section_titles else ["Overall Progress"]:
+        prompt += f"\n{section}:\n"
+        
+        # Get early and recent content for this section
+        all_section_notes = []
+        for report in reports:
+            note = _extract_section_content(report, section)
+            if note:
+                all_section_notes.append(note)
+        
+        if len(all_section_notes) >= 2:
+            prompt += f"  Early: {all_section_notes[0]}\n"
+            prompt += f"  Recent: {all_section_notes[-1]}\n"
+        elif all_section_notes:
+            prompt += f"  Notes: {all_section_notes[0]}\n"
+    
+    prompt += f"\nGenerate a comprehensive PROGRESS SUMMARY with the heading 'PROGRESS SUMMARY' followed by each section title with consolidated progress descriptions:\n"
+    
+    return prompt

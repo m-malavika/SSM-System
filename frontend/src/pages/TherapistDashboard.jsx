@@ -608,12 +608,6 @@ const TherapistDashboard = () => {
                 setSubmitError(null);
                 
                 try {
-                  if (!progressNotes.trim()) {
-                    setSubmitError("Please fill in Progress Notes");
-                    setIsSubmitting(false);
-                    return;
-                  }
-
                   const token = localStorage.getItem("token");
                   if (!token) {
                     setSubmitError("Authentication token not found. Please log in again.");
@@ -625,7 +619,6 @@ const TherapistDashboard = () => {
                     student_id: selectedStudent.id,
                     report_date: reportDate,
                     therapy_type: therapyType,
-                    progress_notes: progressNotes,
                     goals_achieved: goalsAchieved,
                     progress_level: progressLevel,
                   };
@@ -639,7 +632,6 @@ const TherapistDashboard = () => {
                   
                   setReportDate(new Date().toISOString().slice(0, 10));
                   setTherapyType("Occupational Therapy");
-                  setProgressNotes("");
                   setGoalsAchieved({
                     receptive_language: { checked: false, notes: "" },
                     expressive_language: { checked: false, notes: "" },
@@ -852,17 +844,6 @@ const TherapistDashboard = () => {
                     <div className="text-xs text-gray-500 mt-1">{goalsAchieved.narrative_skills.notes.length}/250</div>
                   </div>
                 </div>
-              </div>
-              <div className="mb-4">
-                <label className="block text-[#170F49] font-medium mb-1">
-                  Progress Notes
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
-                  rows={3}
-                  value={progressNotes}
-                  onChange={(e) => setProgressNotes(e.target.value)}
-                />
               </div>
               <div className="mb-6">
                 <label className="block text-[#170F49] font-medium mb-1">
