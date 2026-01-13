@@ -11,16 +11,104 @@ const TherapistDashboard = () => {
     new Date().toISOString().slice(0, 10)
   );
   const [therapyType, setTherapyType] = useState("Occupational Therapy");
-  const [progressNotes, setProgressNotes] = useState("");
-  const [goalsAchieved, setGoalsAchieved] = useState({
-    receptive_language: { checked: false, notes: "" },
-    expressive_language: { checked: false, notes: "" },
-    oral_motor_opt: { checked: false, notes: "" },
-    pragmatic_language: { checked: false, notes: "" },
-    narrative_skills: { checked: false, notes: "" }
-  });
+
+  // Define goals for each therapy type
+  const getGoalsForTherapyType = (therapy) => {
+    const goalsMap = {
+      "Behavioral Therapy": {
+        behavioral_management: {
+          checked: false,
+          notes: "",
+          label: "Behavioral Management",
+        },
+        emotional_regulation: {
+          checked: false,
+          notes: "",
+          label: "Emotional Regulation",
+        },
+        social_skills: { checked: false, notes: "", label: "Social Skills" },
+        coping_strategies: {
+          checked: false,
+          notes: "",
+          label: "Coping Strategies",
+        },
+      },
+      "Occupational Therapy": {
+        fine_motor_skills: {
+          checked: false,
+          notes: "",
+          label: "Fine Motor Skills",
+        },
+        gross_motor_skills: {
+          checked: false,
+          notes: "",
+          label: "Gross Motor Skills",
+        },
+        daily_living_activities: {
+          checked: false,
+          notes: "",
+          label: "Daily Living Activities",
+        },
+        sensory_integration: {
+          checked: false,
+          notes: "",
+          label: "Sensory Integration",
+        },
+      },
+      "Physical Therapy": {
+        strength_endurance: {
+          checked: false,
+          notes: "",
+          label: "Strength & Endurance",
+        },
+        flexibility_range: {
+          checked: false,
+          notes: "",
+          label: "Flexibility & Range of Motion",
+        },
+        balance_coordination: {
+          checked: false,
+          notes: "",
+          label: "Balance & Coordination",
+        },
+        mobility_gait: { checked: false, notes: "", label: "Mobility & Gait" },
+      },
+      "Speech Therapy": {
+        receptive_language: {
+          checked: false,
+          notes: "",
+          label: "Receptive Language Skills (Comprehension)",
+        },
+        expressive_language: {
+          checked: false,
+          notes: "",
+          label: "Expressive Language Skills",
+        },
+        oral_motor_opt: {
+          checked: false,
+          notes: "",
+          label: "Oral Motor & Oral Placement Therapy (OPT) Goals",
+        },
+        pragmatic_language: {
+          checked: false,
+          notes: "",
+          label: "Pragmatic Language Skills (Social Communication)",
+        },
+        narrative_skills: {
+          checked: false,
+          notes: "",
+          label: "Narrative Skills",
+        },
+      },
+    };
+    return goalsMap[therapy] || goalsMap["Speech Therapy"];
+  };
+
+  const [goalsAchieved, setGoalsAchieved] = useState(
+    getGoalsForTherapyType("Occupational Therapy")
+  );
   const [progressLevel, setProgressLevel] = useState("Excellent");
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -38,6 +126,11 @@ const TherapistDashboard = () => {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Update goals when therapy type changes
+  useEffect(() => {
+    setGoalsAchieved(getGoalsForTherapyType(therapyType));
+  }, [therapyType]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,9 +154,12 @@ const TherapistDashboard = () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-        const { data } = await axios.get("http://localhost:8000/api/v1/users/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const { data } = await axios.get(
+          "http://localhost:8000/api/v1/users/me",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         if (data?.username) setUserName(data.username);
         else if (data?.email) setUserName(data.email.split("@")[0]);
       } catch (err) {
@@ -84,23 +180,34 @@ const TherapistDashboard = () => {
           page: 1,
           page_size: 100,
         };
-        if (studentSearch && studentSearch.trim()) params.search = studentSearch.trim();
-        if (selectedClass && selectedClass !== "all") params.class_name = selectedClass;
+        if (studentSearch && studentSearch.trim())
+          params.search = studentSearch.trim();
+        if (selectedClass && selectedClass !== "all")
+          params.class_name = selectedClass;
 
-        const { data } = await axios.get("http://localhost:8000/api/v1/students/", { params });
-        const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
-        
-        const normalized = items.map(s => ({
+        const { data } = await axios.get(
+          "http://localhost:8000/api/v1/students/",
+          { params }
+        );
+        const items = Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        const normalized = items.map((s) => ({
           ...s,
           photo_url: s.photo_url || s.photoUrl || null,
         }));
-        
-        const sortedStudents = [...normalized].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+        const sortedStudents = [...normalized].sort((a, b) =>
+          (a.name || "").localeCompare(b.name || "")
+        );
 
         // For therapists, we'll show students where therapy_provider or therapist matches the logged-in username
         // Or if no specific filter is available, show all students (adjust based on your API)
         const filteredByTherapist = sortedStudents; // Adjust this filter based on your data model
-        
+
         setStudents(filteredByTherapist);
       } catch (err) {
         console.error("Error fetching students:", err);
@@ -143,12 +250,16 @@ const TherapistDashboard = () => {
 
     try {
       setIsChangingPassword(true);
-      await axios.post("http://localhost:8000/api/v1/auth/change-password", {
-        current_password: currentPassword,
-        new_password: newPassword,
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.post(
+        "http://localhost:8000/api/v1/auth/change-password",
+        {
+          current_password: currentPassword,
+          new_password: newPassword,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setPasswordSuccess("Password updated successfully.");
       setCurrentPassword("");
       setNewPassword("");
@@ -158,7 +269,11 @@ const TherapistDashboard = () => {
         setPasswordSuccess("");
       }, 1500);
     } catch (err) {
-      const msg = (err.response?.data?.detail || err.response?.data?.message || err.message || "Failed to change password. Please try again.");
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to change password. Please try again.";
       setPasswordError(msg);
     } finally {
       setIsChangingPassword(false);
@@ -376,10 +491,15 @@ const TherapistDashboard = () => {
           {/* Student List */}
           <div className="grid grid-cols-1 gap-4 px-4">
             {studentsLoading ? (
-              <div className="text-center text-[#6F6C8F]">Loading students...</div>
-            ) : students
-              .filter((student) => {
-                const studentClassLabel = (student.class_name || student.className || "").toString();
+              <div className="text-center text-[#6F6C8F]">
+                Loading students...
+              </div>
+            ) : students.filter((student) => {
+                const studentClassLabel = (
+                  student.class_name ||
+                  student.className ||
+                  ""
+                ).toString();
                 const matchesSearch =
                   (student.name || "")
                     .toLowerCase()
@@ -396,11 +516,17 @@ const TherapistDashboard = () => {
 
                 return matchesSearch && matchesClass;
               }).length === 0 ? (
-              <div className="text-center text-[#6F6C8F]">No students found.</div>
+              <div className="text-center text-[#6F6C8F]">
+                No students found.
+              </div>
             ) : (
               students
                 .filter((student) => {
-                  const studentClassLabel = (student.class_name || student.className || "").toString();
+                  const studentClassLabel = (
+                    student.class_name ||
+                    student.className ||
+                    ""
+                  ).toString();
                   const matchesSearch =
                     (student.name || "")
                       .toLowerCase()
@@ -426,7 +552,12 @@ const TherapistDashboard = () => {
                     <div className="flex items-center space-x-4 text-[#170F49]">
                       <div className="w-16 h-16 rounded-lg overflow-hidden">
                         <img
-                          src={student.photo_url || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(student.name || 'S')}&size=250&background=EFEFEF&color=170F49`}
+                          src={
+                            student.photo_url ||
+                            `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(
+                              student.name || "S"
+                            )}&size=250&background=EFEFEF&color=170F49`
+                          }
                           alt="Student"
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -458,15 +589,7 @@ const TherapistDashboard = () => {
                           setSelectedStudent(student);
                           setShowReportDialog(true);
                           setReportDate(new Date().toISOString().slice(0, 10));
-                          setTherapyType("Occupational Therapy");
-                          setProgressNotes("");
-                          setGoalsAchieved({
-                            receptive_language: { checked: false, notes: "" },
-                            expressive_language: { checked: false, notes: "" },
-                            oral_motor_opt: { checked: false, notes: "" },
-                            pragmatic_language: { checked: false, notes: "" },
-                            narrative_skills: { checked: false, notes: "" }
-                          });
+                          setTherapyType("Speech Therapy");
                           setProgressLevel("Excellent");
                         }}
                       >
@@ -537,7 +660,9 @@ const TherapistDashboard = () => {
             </h2>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#170F49] mb-1">Current Password</label>
+                <label className="block text-sm font-medium text-[#170F49] mb-1">
+                  Current Password
+                </label>
                 <input
                   type="password"
                   className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
@@ -546,7 +671,9 @@ const TherapistDashboard = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#170F49] mb-1">New Password</label>
+                <label className="block text-sm font-medium text-[#170F49] mb-1">
+                  New Password
+                </label>
                 <input
                   type="password"
                   className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
@@ -555,7 +682,9 @@ const TherapistDashboard = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#170F49] mb-1">Confirm New Password</label>
+                <label className="block text-sm font-medium text-[#170F49] mb-1">
+                  Confirm New Password
+                </label>
                 <input
                   type="password"
                   className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
@@ -606,11 +735,13 @@ const TherapistDashboard = () => {
                 e.preventDefault();
                 setIsSubmitting(true);
                 setSubmitError(null);
-                
+
                 try {
                   const token = localStorage.getItem("token");
                   if (!token) {
-                    setSubmitError("Authentication token not found. Please log in again.");
+                    setSubmitError(
+                      "Authentication token not found. Please log in again."
+                    );
                     setIsSubmitting(false);
                     return;
                   }
@@ -623,33 +754,31 @@ const TherapistDashboard = () => {
                     progress_level: progressLevel,
                   };
 
-                  const response = await axios.post("http://localhost:8000/api/v1/therapy-reports/", payload, {
-                    headers: { 
-                      Authorization: `Bearer ${token}`,
-                      "Content-Type": "application/json"
-                    },
-                  });
-                  
+                  const response = await axios.post(
+                    "http://localhost:8000/api/v1/therapy-reports/",
+                    payload,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                      },
+                    }
+                  );
+
                   setReportDate(new Date().toISOString().slice(0, 10));
                   setTherapyType("Occupational Therapy");
-                  setGoalsAchieved({
-                    receptive_language: { checked: false, notes: "" },
-                    expressive_language: { checked: false, notes: "" },
-                    oral_motor_opt: { checked: false, notes: "" },
-                    pragmatic_language: { checked: false, notes: "" },
-                    narrative_skills: { checked: false, notes: "" }
-                  });
                   setProgressLevel("Excellent");
                   setShowReportDialog(false);
                   setShowSuccessModal(true);
-                  
+
                   setTimeout(() => setShowSuccessModal(false), 3000);
                 } catch (err) {
                   console.error("Failed to save report:", err);
-                  const errorMessage = err.response?.data?.detail || 
-                                     err.response?.data?.message || 
-                                     err.message || 
-                                     "Failed to save report. Please try again.";
+                  const errorMessage =
+                    err.response?.data?.detail ||
+                    err.response?.data?.message ||
+                    err.message ||
+                    "Failed to save report. Please try again.";
                   setSubmitError(errorMessage);
                 } finally {
                   setIsSubmitting(false);
@@ -677,172 +806,68 @@ const TherapistDashboard = () => {
                   onChange={(e) => setTherapyType(e.target.value)}
                 >
                   <option value="Behavioral Therapy">Behavioral Therapy</option>
-                  <option value="Cognitive Therapy">Cognitive Therapy</option>
-                  <option value="Occupational Therapy">Occupational Therapy</option>
+                  <option value="Occupational Therapy">
+                    Occupational Therapy
+                  </option>
                   <option value="Physical Therapy">Physical Therapy</option>
                   <option value="Speech Therapy">Speech Therapy</option>
                 </select>
               </div>
-              
+
               <div className="mb-4">
                 <label className="block text-[#170F49] font-medium mb-3">
-                  Goals Achieved
+                  Goals Addressed
                 </label>
                 <div className="space-y-4">
-                  {/* Receptive Language Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="receptive_language"
-                        checked={goalsAchieved.receptive_language.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          receptive_language: { ...goalsAchieved.receptive_language, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
+                  {Object.entries(goalsAchieved).map(([goalKey, goalData]) => (
+                    <div
+                      key={goalKey}
+                      className="border rounded-lg p-3 bg-gray-50"
+                    >
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="checkbox"
+                          id={goalKey}
+                          checked={goalData.checked}
+                          onChange={(e) =>
+                            setGoalsAchieved({
+                              ...goalsAchieved,
+                              [goalKey]: {
+                                ...goalsAchieved[goalKey],
+                                checked: e.target.checked,
+                              },
+                            })
+                          }
+                          className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
+                        />
+                        <label
+                          htmlFor={goalKey}
+                          className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer"
+                        >
+                          {goalData.label}
+                        </label>
+                      </div>
+                      <textarea
+                        placeholder="Describe progress (2-3 sentences)"
+                        value={goalData.notes}
+                        onChange={(e) =>
+                          setGoalsAchieved({
+                            ...goalsAchieved,
+                            [goalKey]: {
+                              ...goalsAchieved[goalKey],
+                              notes: e.target.value.substring(0, 250),
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
+                        rows="2"
+                        maxLength="250"
                       />
-                      <label htmlFor="receptive_language" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Receptive Language Skills (Comprehension)
-                      </label>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {goalData.notes.length}/250
+                      </div>
                     </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.receptive_language.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        receptive_language: { ...goalsAchieved.receptive_language, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.receptive_language.notes.length}/250</div>
-                  </div>
-
-                  {/* Expressive Language Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="expressive_language"
-                        checked={goalsAchieved.expressive_language.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          expressive_language: { ...goalsAchieved.expressive_language, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="expressive_language" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Expressive Language Skills
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.expressive_language.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        expressive_language: { ...goalsAchieved.expressive_language, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.expressive_language.notes.length}/250</div>
-                  </div>
-
-                  {/* Oral Motor & OPT Goals */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="oral_motor_opt"
-                        checked={goalsAchieved.oral_motor_opt.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          oral_motor_opt: { ...goalsAchieved.oral_motor_opt, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="oral_motor_opt" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Oral Motor & Oral Placement Therapy (OPT) Goals
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.oral_motor_opt.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        oral_motor_opt: { ...goalsAchieved.oral_motor_opt, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.oral_motor_opt.notes.length}/250</div>
-                  </div>
-
-                  {/* Pragmatic Language Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="pragmatic_language"
-                        checked={goalsAchieved.pragmatic_language.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          pragmatic_language: { ...goalsAchieved.pragmatic_language, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="pragmatic_language" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Pragmatic Language Skills (Social Communication)
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.pragmatic_language.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        pragmatic_language: { ...goalsAchieved.pragmatic_language, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.pragmatic_language.notes.length}/250</div>
-                  </div>
-
-                  {/* Narrative Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="narrative_skills"
-                        checked={goalsAchieved.narrative_skills.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          narrative_skills: { ...goalsAchieved.narrative_skills, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="narrative_skills" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Narrative Skills
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.narrative_skills.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        narrative_skills: { ...goalsAchieved.narrative_skills, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.narrative_skills.notes.length}/250</div>
-                  </div>
+                  ))}
                 </div>
               </div>
               <div className="mb-6">
@@ -860,19 +885,27 @@ const TherapistDashboard = () => {
                   <option>Needs Improvement</option>
                 </select>
               </div>
-              
+
               {/* Error Display */}
               {submitError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-center">
-                    <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    <svg
+                      className="w-5 h-5 text-red-500 mr-2"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                     <span className="text-red-700 text-sm">{submitError}</span>
                   </div>
                 </div>
               )}
-              
+
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
@@ -892,9 +925,25 @@ const TherapistDashboard = () => {
                 >
                   {isSubmitting ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
                       </svg>
                       Saving...
                     </>
@@ -914,12 +963,26 @@ const TherapistDashboard = () => {
           <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4 transform animate-pulse">
             <div className="text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                <svg
+                  className="w-8 h-8 text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M5 13l4 4L19 7"
+                  ></path>
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-[#170F49] mb-2">Report Saved Successfully!</h3>
-              <p className="text-gray-600 mb-4">The therapy report has been submitted and saved to the system.</p>
+              <h3 className="text-xl font-bold text-[#170F49] mb-2">
+                Report Saved Successfully!
+              </h3>
+              <p className="text-gray-600 mb-4">
+                The therapy report has been submitted and saved to the system.
+              </p>
               <button
                 onClick={() => setShowSuccessModal(false)}
                 className="px-6 py-2 bg-[#E38B52] text-white rounded-lg hover:bg-[#E38B52]/90 font-medium"
