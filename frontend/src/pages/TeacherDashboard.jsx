@@ -2,6 +2,48 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+// Helper function to get therapy-specific sections
+const getTherapySections = (therapyType) => {
+  const sections = {
+    "Speech Therapy": {
+      receptive_language: { checked: false, notes: "", label: "Receptive Language Skills (Comprehension)" },
+      expressive_language: { checked: false, notes: "", label: "Expressive Language Skills" },
+      oral_motor_opt: { checked: false, notes: "", label: "Oral Motor & Oral Placement Therapy (OPT) Goals" },
+      pragmatic_language: { checked: false, notes: "", label: "Pragmatic Language Skills (Social Communication)" },
+      narrative_skills: { checked: false, notes: "", label: "Narrative Skills" }
+    },
+    "Behavioral Therapy": {
+      behavior_regulation: { checked: false, notes: "", label: "Behavior Regulation & Self-Control" },
+      attention_compliance: { checked: false, notes: "", label: "Attention, Compliance & Task Engagement" },
+      emotional_regulation: { checked: false, notes: "", label: "Emotional Regulation Skills" },
+      social_behavior: { checked: false, notes: "", label: "Social Behavior & Interaction Skills" },
+      adaptive_behavior: { checked: false, notes: "", label: "Adaptive Behavior & Functional Skills" }
+    },
+    "Cognitive Therapy": {
+      attention_concentration: { checked: false, notes: "", label: "Attention & Concentration Skills" },
+      memory_recall: { checked: false, notes: "", label: "Memory & Recall Skills" },
+      problem_solving: { checked: false, notes: "", label: "Problem Solving & Reasoning Skills" },
+      executive_functioning: { checked: false, notes: "", label: "Executive Functioning Skills" },
+      cognitive_flexibility: { checked: false, notes: "", label: "Cognitive Flexibility & Processing Skills" }
+    },
+    "Occupational Therapy": {
+      fine_motor: { checked: false, notes: "", label: "Fine Motor Skills" },
+      sensory_processing: { checked: false, notes: "", label: "Sensory Processing & Integration" },
+      visual_motor: { checked: false, notes: "", label: "Visual-Motor Integration Skills" },
+      daily_living: { checked: false, notes: "", label: "Activities of Daily Living (ADL)" },
+      handwriting: { checked: false, notes: "", label: "Handwriting & Pre-Academic Skills" }
+    },
+    "Physical Therapy": {
+      gross_motor: { checked: false, notes: "", label: "Gross Motor Skills" },
+      balance_postural: { checked: false, notes: "", label: "Balance & Postural Control" },
+      strength_endurance: { checked: false, notes: "", label: "Strength & Endurance" },
+      coordination_planning: { checked: false, notes: "", label: "Coordination & Motor Planning" },
+      functional_mobility: { checked: false, notes: "", label: "Functional Mobility Skills" }
+    }
+  };
+  return sections[therapyType] || sections["Speech Therapy"];
+};
+
 const TeacherDashboard = () => {
   const navigate = useNavigate();
   //here 1st
@@ -11,15 +53,9 @@ const TeacherDashboard = () => {
   const [reportDate, setReportDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
-  const [therapyType, setTherapyType] = useState("Occupational Therapy");
+  const [therapyType, setTherapyType] = useState("Speech Therapy");
   const [progressNotes, setProgressNotes] = useState("");
-  const [goalsAchieved, setGoalsAchieved] = useState({
-    receptive_language: { checked: false, notes: "" },
-    expressive_language: { checked: false, notes: "" },
-    oral_motor_opt: { checked: false, notes: "" },
-    pragmatic_language: { checked: false, notes: "" },
-    narrative_skills: { checked: false, notes: "" }
-  });
+  const [goalsAchieved, setGoalsAchieved] = useState(getTherapySections("Speech Therapy"));
   const [progressLevel, setProgressLevel] = useState("Excellent");
   
   // Enhanced UX states
@@ -452,15 +488,10 @@ const TeacherDashboard = () => {
                         setSelectedStudent(student);
                         setShowReportDialog(true);
                         setReportDate(new Date().toISOString().slice(0, 10));
-                        setTherapyType("Occupational Therapy");
+                        const defaultType = "Speech Therapy";
+                        setTherapyType(defaultType);
                         setProgressNotes("");
-                        setGoalsAchieved({
-                          receptive_language: { checked: false, notes: "" },
-                          expressive_language: { checked: false, notes: "" },
-                          oral_motor_opt: { checked: false, notes: "" },
-                          pragmatic_language: { checked: false, notes: "" },
-                          narrative_skills: { checked: false, notes: "" }
-                        });
+                        setGoalsAchieved(getTherapySections(defaultType));
                         setProgressLevel("Excellent");
                       }}
                     >
@@ -640,15 +671,10 @@ const TeacherDashboard = () => {
                   
                   // Reset form and show success
                   setReportDate(new Date().toISOString().slice(0, 10));
-                  setTherapyType("Occupational Therapy");
+                  const defaultType = "Speech Therapy";
+                  setTherapyType(defaultType);
                   setProgressNotes("");
-                  setGoalsAchieved({
-                    receptive_language: { checked: false, notes: "" },
-                    expressive_language: { checked: false, notes: "" },
-                    oral_motor_opt: { checked: false, notes: "" },
-                    pragmatic_language: { checked: false, notes: "" },
-                    narrative_skills: { checked: false, notes: "" }
-                  });
+                  setGoalsAchieved(getTherapySections(defaultType));
                   setProgressLevel("Excellent");
                   setShowReportDialog(false);
                   setShowSuccessModal(true);
@@ -685,13 +711,17 @@ const TeacherDashboard = () => {
                 <select
                   className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
                   value={therapyType}
-                  onChange={(e) => setTherapyType(e.target.value)}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setTherapyType(newType);
+                    setGoalsAchieved(getTherapySections(newType));
+                  }}
                 >
+                  <option value="Speech Therapy">Speech Therapy</option>
                   <option value="Behavioral Therapy">Behavioral Therapy</option>
                   <option value="Cognitive Therapy">Cognitive Therapy</option>
                   <option value="Occupational Therapy">Occupational Therapy</option>
                   <option value="Physical Therapy">Physical Therapy</option>
-                  <option value="Speech Therapy">Speech Therapy</option>
                 </select>
               </div>
               
@@ -700,160 +730,37 @@ const TeacherDashboard = () => {
                   Goals Achieved
                 </label>
                 <div className="space-y-4">
-                  {/* Receptive Language Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="receptive_language"
-                        checked={goalsAchieved.receptive_language.checked}
+                  {Object.entries(goalsAchieved).map(([key, value]) => (
+                    <div key={key} className="border rounded-lg p-3 bg-gray-50">
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="checkbox"
+                          id={key}
+                          checked={value.checked}
+                          onChange={(e) => setGoalsAchieved({
+                            ...goalsAchieved,
+                            [key]: { ...value, checked: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
+                        />
+                        <label htmlFor={key} className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
+                          {value.label}
+                        </label>
+                      </div>
+                      <textarea
+                        placeholder="Describe progress (2-3 sentences)"
+                        value={value.notes}
                         onChange={(e) => setGoalsAchieved({
                           ...goalsAchieved,
-                          receptive_language: { ...goalsAchieved.receptive_language, checked: e.target.checked }
+                          [key]: { ...value, notes: e.target.value.substring(0, 250) }
                         })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
+                        className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
+                        rows="2"
+                        maxLength="250"
                       />
-                      <label htmlFor="receptive_language" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Receptive Language Skills (Comprehension)
-                      </label>
+                      <div className="text-xs text-gray-500 mt-1">{value.notes.length}/250</div>
                     </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.receptive_language.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        receptive_language: { ...goalsAchieved.receptive_language, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.receptive_language.notes.length}/250</div>
-                  </div>
-
-                  {/* Expressive Language Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="expressive_language"
-                        checked={goalsAchieved.expressive_language.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          expressive_language: { ...goalsAchieved.expressive_language, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="expressive_language" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Expressive Language Skills
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.expressive_language.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        expressive_language: { ...goalsAchieved.expressive_language, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.expressive_language.notes.length}/250</div>
-                  </div>
-
-                  {/* Oral Motor & OPT Goals */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="oral_motor_opt"
-                        checked={goalsAchieved.oral_motor_opt.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          oral_motor_opt: { ...goalsAchieved.oral_motor_opt, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="oral_motor_opt" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Oral Motor & Oral Placement Therapy (OPT) Goals
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.oral_motor_opt.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        oral_motor_opt: { ...goalsAchieved.oral_motor_opt, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.oral_motor_opt.notes.length}/250</div>
-                  </div>
-
-                  {/* Pragmatic Language Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="pragmatic_language"
-                        checked={goalsAchieved.pragmatic_language.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          pragmatic_language: { ...goalsAchieved.pragmatic_language, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="pragmatic_language" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Pragmatic Language Skills (Social Communication)
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.pragmatic_language.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        pragmatic_language: { ...goalsAchieved.pragmatic_language, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.pragmatic_language.notes.length}/250</div>
-                  </div>
-
-                  {/* Narrative Skills */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        id="narrative_skills"
-                        checked={goalsAchieved.narrative_skills.checked}
-                        onChange={(e) => setGoalsAchieved({
-                          ...goalsAchieved,
-                          narrative_skills: { ...goalsAchieved.narrative_skills, checked: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                      />
-                      <label htmlFor="narrative_skills" className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer">
-                        Narrative Skills
-                      </label>
-                    </div>
-                    <textarea
-                      placeholder="Describe progress (2-3 sentences)"
-                      value={goalsAchieved.narrative_skills.notes}
-                      onChange={(e) => setGoalsAchieved({
-                        ...goalsAchieved,
-                        narrative_skills: { ...goalsAchieved.narrative_skills, notes: e.target.value.substring(0, 250) }
-                      })}
-                      className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                      rows="2"
-                      maxLength="250"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">{goalsAchieved.narrative_skills.notes.length}/250</div>
-                  </div>
+                  ))}
                 </div>
               </div>
               <div className="mb-4">
