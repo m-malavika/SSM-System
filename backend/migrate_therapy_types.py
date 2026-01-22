@@ -25,7 +25,6 @@ def migrate_therapy_types():
             'Physio': 'Physical Therapy', 
             'Speech': 'Speech Therapy',
             'Behavioral': 'Behavioral Therapy',
-            'Developmental': 'Cognitive Therapy',  # Map Developmental to Cognitive
             'Clinical': 'Behavioral Therapy',      # Map Clinical to Behavioral
         }
         

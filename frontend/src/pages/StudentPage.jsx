@@ -1932,7 +1932,6 @@ const handleGenerateSummaryReport = () => {
                       >
                         <option value="">All Therapy Types</option>
                         <option value="Behavioral Therapy">Behavioral Therapy</option>
-                        <option value="Cognitive Therapy">Cognitive Therapy</option>
                         <option value="Occupational Therapy">Occupational Therapy</option>
                         <option value="Physical Therapy">Physical Therapy</option>
                         <option value="Speech Therapy">Speech Therapy</option>
