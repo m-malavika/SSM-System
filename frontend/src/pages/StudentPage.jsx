@@ -143,7 +143,9 @@ const StudentPage = () => {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState(null);
   const [extractedTables, setExtractedTables] = useState([]);
+  const [savedTables, setSavedTables] = useState([]);
   const [ocrMethod, setOcrMethod] = useState(null);
+  const [reportDate, setReportDate] = useState('');
   const [extractionData, setExtractionData] = useState(null);
   const [extractionSummary, setExtractionSummary] = useState(null);
   const fileInputRef = useRef(null);
@@ -1045,6 +1047,22 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [id]);
 
+useEffect(() => {
+  if (!id) return;
+  try {
+    if (typeof window === 'undefined') return;
+    const key = `special-education-tables:${id}`;
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      setSavedTables(parsed);
+    }
+  } catch (err) {
+    console.warn('Failed to load saved Special Education tables', err);
+  }
+}, [id]);
+
   // OCR Image Upload Handlers
   const handleOcrImageSelect = (e) => {
     const file = e.target.files[0];
@@ -1056,7 +1074,7 @@ useEffect(() => {
         if (fileInputRef.current) fileInputRef.current.value = null;
         return;
       }
-      
+  
       // Validate file size (max 10MB)
       const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
@@ -1064,10 +1082,8 @@ useEffect(() => {
         if (fileInputRef.current) fileInputRef.current.value = null;
         return;
       }
-      
-      // Directly use the file for OCR
+  
       setOcrImage(file);
-      handleOcrUploadWithFile(file);
       setOcrError(null);
     }
   };
@@ -1083,7 +1099,6 @@ useEffect(() => {
 
     setOcrLoading(true);
     setOcrError(null);
-    setExtractedTables([]);
     
     const formData = new FormData();
     formData.append('file', file);
@@ -1103,10 +1118,37 @@ useEffect(() => {
       const data = res.data;
       
       if (data.success && data.tables && data.tables.length > 0) {
+        const datedTables = data.tables.map(t => ({
+          ...t,
+          report_date: reportDate || null,
+        }));
         setExtractedTables(data.tables);
         setOcrMethod(data.method);
         setExtractionData(data.extracted_data || null);
         setExtractionSummary(data.extraction_summary || null);
+      
+        // Append to per-student history and persist in localStorage
+        try {
+          const key = `special-education-tables:${id}`;
+          const extractedAt = new Date().toISOString();
+          
+          setSavedTables(prev => {
+            // attach a date to each new table
+            const newTables = data.tables.map(t => ({
+              ...t,
+              extracted_at: extractedAt,
+            }));
+            const updated = [...prev, ...newTables];
+          
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(key, JSON.stringify(updated));
+            }
+            return updated;
+          });
+        } catch (err) {
+          console.warn('Failed to save Special Education tables history', err);
+        }
+      
         showToast(`Successfully extracted ${data.tables.length} table(s) using ${data.method}!`, 'success');
       } else {
         setOcrError('No tables detected in the image. Please try a different image or adjust the crop area.');
@@ -1142,6 +1184,41 @@ useEffect(() => {
     if (fileInputRef.current) fileInputRef.current.value = null;
   };
 
+  const handleDeleteTable = (viewIndex) => {
+    setSavedTables(prev => {
+      // Reproduce the same sort used in the JSX
+      const sorted = [...prev].sort((a, b) => {
+        const da = new Date(a.report_date || a.extracted_at || 0);
+        const db = new Date(b.report_date || b.extracted_at || 0);
+        return db - da; // newest first
+      });
+      const tableToDelete = sorted[viewIndex];
+      const updated = prev.filter(t => t !== tableToDelete);
+
+      try {
+        if (typeof window !== 'undefined' && id) {
+          const key = `special-education-tables:${id}`;
+          window.localStorage.setItem(key, JSON.stringify(updated));
+        }
+      } catch (err) {
+        console.warn('Failed to persist deleted table list', err);
+      }
+
+      return updated;
+    });
+
+    // keep extractedTables in sync for current session
+    setExtractedTables(prev => {
+      const sorted = [...prev].sort((a, b) => {
+        const da = new Date(a.report_date || a.extracted_at || 0);
+        const db = new Date(b.report_date || b.extracted_at || 0);
+        return db - da;
+      });
+      const tableToDelete = sorted[viewIndex];
+      return prev.filter(t => t !== tableToDelete);
+    });
+  };
+
   const handleExportToCSV = (table, index) => {
     if (!table || !table.rows || table.rows.length === 0) return;
     
@@ -1169,7 +1246,7 @@ useEffect(() => {
         });
       csvRows.push(values.join(','));
     });
-    
+
     const csvContent = csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -3096,33 +3173,66 @@ const handleGenerateSummaryReport = () => {
               </div>
             </div>
           ) : activeTab === "iep" ? (
+            <div className="text-center text-[#170F49] text-xl font-semibold py-16">
+              add content
+            </div>
+          ) : activeTab === "special-education" ? (
             <div className="max-w-6xl mx-auto p-6">
               {/* Header */}
               <div className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] rounded-2xl shadow-lg p-6 mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">IEP Report Table Extractor</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">Special Education Report </h2>
                 <p className="text-white/90">Upload an image of a student report table to extract data automatically</p>
                 <p className="text-white/70 text-sm mt-2">⚡ Fast A/B detection: ~3-8 seconds</p>
               </div>
 
+              {student && (
+                <div className="mt-4 mb-2 bg-white/70 rounded-xl px-4 py-3 border border-[#E38B52]/20">
+                  <p className="text-sm text-[#170F49]">
+                    Special Education report for:{" "}
+                    <span className="font-semibold">{student.name}</span>
+                    {student.studentId && (
+                      <span className="text-xs text-[#6F6C90] ml-2">
+                        (ID: {student.studentId})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+              
               {/* Upload Section */}
-              <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Report Image
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/bmp,image/tiff"
-                      onChange={handleOcrImageSelect}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Supported formats: JPG, PNG, BMP, TIFF (Max 10MB)
-                    </p>
-                  </div>
-                  
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex-1">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* File input (left) */}
+                    <div className="md:w-1/2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Report Image
+                      </label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/bmp,image/tiff"
+                        onChange={handleOcrImageSelect}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Supported formats: JPG, PNG, BMP, TIFF (Max 10MB)
+                      </p>
+                    </div>
+              
+                    {/* Report date (right) */}
+                    <div className="md:w-1/2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Report Date
+                      </label>
+                      <input
+                        type="date"
+                        value={reportDate}
+                        onChange={e => setReportDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent"
+                      />
+                    </div>
+                  </div>                
                   <div className="flex gap-3 pt-6">
                     <button
                       onClick={handleOcrUpload}
@@ -3173,25 +3283,10 @@ const handleGenerateSummaryReport = () => {
                     </div>
                   </div>
                 )}
-
-                {/* Selected File Info */}
-                {ocrImage && !ocrLoading && (
-                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900">{ocrImage.name}</p>
-                      <p className="text-xs text-blue-700">
-                        Size: {(ocrImage.size / 1024).toFixed(2)} KB
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Results Section */}
-              {extractedTables.length > 0 && (
+              {savedTables.length > 0 && (
                 <div className="space-y-6">
                   {/* Extraction Data Display */}
                   {extractionSummary && (
@@ -3231,7 +3326,7 @@ const handleGenerateSummaryReport = () => {
                     </svg>
                     <div>
                       <p className="text-sm font-medium text-green-800">
-                        Successfully extracted {extractedTables.length} table(s)
+                        Successfully extracted {savedTables.length} table(s)
                       </p>
                       <p className="text-xs text-green-700 mt-1">
                         Method used: {ocrMethod || 'Unknown'}
@@ -3239,90 +3334,175 @@ const handleGenerateSummaryReport = () => {
                     </div>
                   </div>
 
-                  {/* Display Tables */}
-                  {extractedTables.map((table, tableIndex) => (
-                    <div key={tableIndex} className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                      {/* RAW EXTRACTION REPORT - Show what was actually extracted */}
-                      {table.extraction_report && table.extraction_report.length > 0 && (
-                        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-4">
-                          <h4 className="text-sm font-semibold text-yellow-900 mb-2">🔍 Raw OCR Extraction Results:</h4>
-                          <div className="text-xs font-mono space-y-1 max-h-60 overflow-y-auto">
-                            {table.extraction_report.map((line, idx) => (
-                              <div key={idx} className="text-yellow-800">{line}</div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Table Header */}
-                      <div className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] px-6 py-4 flex justify-between items-center">
+                  {/* Display Tables (all past + current, collapsible) */}
+                  {[...savedTables]
+                    .sort((a, b) => {
+                      const da = new Date(a.report_date || a.extracted_at || 0);
+                      const db = new Date(b.report_date || b.extracted_at || 0);
+                      return db - da; // newest first
+                    })
+                    .map((table, tableIndex) => (
+                    <details
+                      key={tableIndex}
+                      className="bg-white rounded-2xl shadow-lg overflow-hidden transform transition-all duration-200 hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.01]"
+                    >
+                      {/* Clickable header row */}
+                      <summary className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] px-6 py-4 flex items-center justify-between cursor-pointer list-none">
                         <div>
-                          <h3 className="text-lg font-semibold text-white">
-                            Table {tableIndex + 1}
+                          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                            <span>Table {tableIndex + 1}</span>
                             {table.rows && table.rows.length > 0 && table.rows[0]['Student Name'] && (
-                              <span className="ml-3 text-sm font-normal">- {table.rows[0]['Student Name']}</span>
+                              <span className="text-sm font-normal">
+                                – {table.rows[0]['Student Name']}
+                              </span>
                             )}
                           </h3>
-                          <p className="text-sm text-white/80">
-                            {table.row_count} rows × {(table.headers?.filter(h => h !== 'Student Name' && h !== 'Register Number' && h !== 'Assessment Date').length) || 0} columns
+                          <p className="text-xs text-white/80 mt-1">
+                            Report date: {table.report_date ? table.report_date : 'Not specified'}
+                          </p>
+                          <p className="text-xs text-white/80 mt-1">
+                            Extracted on{' '}
+                            {table.extracted_at
+                              ? new Date(table.extracted_at).toLocaleString()
+                              : 'Unknown'}
                           </p>
                         </div>
-                        <button
-                          onClick={() => handleExportToCSV(table, tableIndex)}
-                          className="px-4 py-2 bg-white text-[#E38B52] rounded-lg hover:bg-gray-100 transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Export CSV
-                        </button>
-                      </div>
+                       <div className="flex items-center gap-3 ml-auto">
+                          {/* Export icon */}
+                          <button
+                            type="button"
+                            aria-label="Export table as CSV"
+                            title="Export CSV"
+                            onClick={e => {
+                              e.preventDefault();
+                              handleExportToCSV(table, tableIndex);
+                            }}
+                            className="w-11 h-11 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-[#E38B52]"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 4v10m0 0l-4-4m4 4l4-4M5 20h14"
+                              />
+                            </svg>
+                          </button>
 
+                          {/* Delete icon */}
+                          <button
+                            type="button"
+                            aria-label="Delete this table"
+                            title="Delete table"
+                            onClick={e => {
+                              e.preventDefault();
+                              if (window.confirm('Delete this table?')) {
+                                handleDeleteTable(tableIndex);
+                              }
+                            }}
+                            className="w-11 h-11 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-red-500"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              className="h-5 w-5"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              {/* lid */}
+                              <path
+                                d="M9 5h6l1 2H8l1-2z"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              {/* body */}
+                              <rect
+                                x="8"
+                                y="7"
+                                width="8"
+                                height="11"
+                                rx="1.5"
+                                strokeWidth="1.8"
+                              />
+                              {/* inner lines */}
+                              <line x1="11" y1="10" x2="11" y2="15" strokeWidth="1.8" strokeLinecap="round" />
+                              <line x1="13" y1="10" x2="13" y2="15" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                          </button>
+                        </div>
+                      </summary>
+                  
+                      {/* Expanded content: table */}                  
                       {/* Table Content */}
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
-                              {table.headers?.filter(h => h !== 'Student Name' && h !== 'Register Number' && h !== 'Assessment Date').map((header, idx) => (
-                                <th
-                                  key={idx}
-                                  className="px-2 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  {header.replace(/^Session\s+/i, '')}
-                                </th>
-                              ))}
+                              {table.headers
+                                ?.filter(
+                                  h =>
+                                    h !== 'Student Name' &&
+                                    h !== 'Register Number' &&
+                                    h !== 'Assessment Date'
+                                )
+                                .map((header, idx) => (
+                                  <th
+                                    key={idx}
+                                    className="px-2 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                                  >
+                                    {header.replace(/^Session\s+/i, '')}
+                                  </th>
+                                ))}
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {table.rows?.map((row, rowIdx) => (
                               <tr key={rowIdx} className="hover:bg-gray-50">
-                                {table.headers?.filter(h => h !== 'Student Name' && h !== 'Register Number' && h !== 'Assessment Date').map((header, cellIdx) => {
-                                  const cellValue = row[header] || '-';
-                                  const isA = cellValue === 'A';
-                                  const isB = cellValue === 'B';
-                                  return (
-                                    <td
-                                      key={cellIdx}
-                                      className={`px-2 py-1 whitespace-nowrap text-xs font-semibold ${
-                                        isA ? 'text-blue-600' : isB ? 'text-red-600' : 'text-gray-900'
-                                      }`}
-                                    >
-                                      {cellValue}
-                                    </td>
-                                  );
-                                })}
+                                {table.headers
+                                  ?.filter(
+                                    h =>
+                                      h !== 'Student Name' &&
+                                      h !== 'Register Number' &&
+                                      h !== 'Assessment Date'
+                                  )
+                                  .map((header, cellIdx) => {
+                                    const cellValue = row[header] || '-';
+                                    const isA = cellValue === 'A';
+                                    const isB = cellValue === 'B';
+                                    return (
+                                      <td
+                                        key={cellIdx}
+                                        className={`px-2 py-1 whitespace-nowrap text-xs font-semibold ${
+                                          isA
+                                            ? 'text-blue-600'
+                                            : isB
+                                            ? 'text-red-600'
+                                            : 'text-gray-900'
+                                        }`}
+                                      >
+                                        {cellValue}
+                                      </td>
+                                    );
+                                  })}
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </details>
                   ))}
                 </div>
               )}
 
               {/* Instructions */}
-              {extractedTables.length === 0 && !ocrLoading && (
+              {savedTables.length === 0 && !ocrLoading && (
                 <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
                   <div className="w-16 h-16 bg-[#E38B52]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3363,10 +3543,6 @@ const handleGenerateSummaryReport = () => {
                   </div>
                 </div>
               )}
-            </div>
-          ) : activeTab === "special-education" ? (
-            <div className="text-center text-[#170F49] text-xl font-semibold py-16">
-              add content
             </div>
           ) : (
             <div className="flex gap-6 items-start justify-center relative max-w-[1600px] mx-auto">
