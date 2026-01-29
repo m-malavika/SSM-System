@@ -139,6 +139,252 @@ const DynamicScrollButtons = () => {
   );
 };
 
+const SPECIAL_EDU_QUESTIONS = {
+  grossmotor: [
+    'Walks independently on flat ground',
+    'Runs without losing balance',
+    'Jumps forward with both feet together',
+    'Climbs stairs with alternating feet',
+    'Stands on one foot for a few seconds',
+    'Kicks a ball towards a target',
+    'Throws a ball overhand',
+    'Catches a medium-sized ball',
+    'Balances while walking on a straight line',
+    'Jumps down safely from a low step',
+  ],
+  finemotor: [
+    'Uses pincer grasp to pick up small objects',
+    'Holds a pencil with three-finger grip',
+    'Draws straight vertical and horizontal lines',
+    'Copies a simple circle',
+    'Builds a tower with small blocks',
+    'Threads beads onto a string',
+    'Uses scissors to cut along a straight line',
+    'Opens and closes simple containers',
+    'Turns pages of a book one at a time',
+    'Buttons and unbuttons large buttons',
+  ],
+  eating: [
+    'Sits appropriately at the table for meals',
+    'Uses a spoon to eat semi-solid food',
+    'Drinks from an open cup without spilling',
+    'Chews food adequately before swallowing',
+    'Accepts a variety of common foods',
+    'Feeds self without constant physical help',
+    'Uses napkin/tissue to wipe mouth when prompted',
+    'Waits appropriately for food to be served',
+    'Washes hands before eating when reminded',
+    'Clears plate or cup after finishing',
+  ],
+  dressing: [
+    'Puts on shirt with minimal help',
+    'Buttons clothing independently',
+    'Zips or unzips jacket',
+    'Puts on trousers correctly',
+    'Chooses weather-appropriate clothes',
+    'Removes shoes independently',
+    'Wears footwear on correct feet',
+    'Manages simple fasteners (hooks/Velcro)',
+    'Keeps clothes tidy during the day',
+    'Changes clothes when wet/dirty',
+  ],
+  grooming: [
+    'Combs hair when prompted',
+    'Washes face independently',
+    'Keeps nails reasonably clean',
+    'Uses handkerchief/tissue appropriately',
+    'Keeps general appearance neat',
+    'Looks in mirror to adjust appearance',
+    'Uses deodorant when guided',
+    'Wipes mouth after eating',
+    'Manages simple grooming items safely',
+    'Shows awareness of personal hygiene',
+  ],
+  toileting: [
+    'Indicates need to use toilet',
+    'Goes to toilet with minimal guidance',
+    'Manages clothing before toileting',
+    'Uses toilet seat appropriately',
+    'Cleans self after toilet use',
+    'Flushes toilet after use',
+    'Washes hands after toileting',
+    'Keeps toilet area reasonably clean',
+    'Remains dry between scheduled times',
+    'Uses toilet independently most days',
+  ],
+  receptivelanguage: [
+    'Responds when name is called',
+    'Understands simple one-step commands',
+    'Understands two-step directions',
+    'Identifies common objects when named',
+    'Understands basic classroom instructions',
+    'Follows group directions in class',
+    'Understands simple “who/what/where”',
+    'Understands yes/no questions',
+    'Understands basic time words (now/later)',
+    'Understands simple positional words',
+  ],
+  expressivelanguage: [
+    'Uses single words to communicate needs',
+    'Uses simple phrases (2–3 words)',
+    'Answers simple questions verbally',
+    'Initiates simple conversation',
+    'Uses gestures along with speech',
+    'Names common objects correctly',
+    'Describes simple actions',
+    'Expresses basic feelings in words',
+    'Speaks clearly enough to be understood',
+    'Asks for help when needed',
+  ],
+  socialinteraction: [
+    'Greets familiar people appropriately',
+    'Maintains eye contact briefly',
+    'Shares materials with peers',
+    'Takes turns during play/activities',
+    'Waits appropriately in a queue',
+    'Joins group activities when invited',
+    'Respects personal space of others',
+    'Shows concern when others are upset',
+    'Follows basic classroom rules',
+    'Participates in group games',
+  ],
+  reading: [
+    'Recognizes own name in print',
+    'Identifies letters of the alphabet',
+    'Matches letters to sounds (phonics)',
+    'Reads simple CVC words (cat, dog)',
+    'Reads simple sight words',
+    'Understands what is read with help',
+    'Reads short sentences aloud',
+    'Tracks text left to right',
+    'Recognizes common classroom labels',
+    'Shows interest in story books',
+  ],
+  writing: [
+    'Holds pencil with functional grip',
+    'Traces straight lines accurately',
+    'Copies simple shapes and patterns',
+    'Writes own name legibly',
+    'Writes a few known words',
+    'Copies from board with support',
+    'Leaves appropriate spacing between words',
+    'Writes within given margins/lines',
+    'Uses capital and small letters',
+    'Completes short writing tasks',
+  ],
+  numbers: [
+    'Counts objects up to 5',
+    'Counts objects up to 10',
+    'Recognizes numerals up to 10',
+    'Matches number to quantity (1–10)',
+    'Performs simple addition with objects',
+    'Performs simple subtraction with objects',
+    'Sequences numbers in correct order',
+    'Understands “more” and “less”',
+    'Reads simple number sentences',
+    'Applies number skills in routine tasks',
+  ],
+  time: [
+    'Understands parts of the day',
+    'Knows days of the week',
+    'Recognizes morning vs afternoon',
+    'Understands “before” and “after”',
+    'Reads time to the hour on a clock',
+    'Reads simple schedules/timetables',
+    'Arrives on time to class with help',
+    'Understands duration (short/long)',
+    'Follows a basic daily routine',
+    'Uses time words appropriately',
+  ],
+  money: [
+    'Recognizes common coins/notes',
+    'Understands basic value differences',
+    'Matches coins to price tags',
+    'Counts small amounts of money',
+    'Hands over money to buy small items',
+    'Waits for and takes change',
+    'Keeps money safely in pocket/bag',
+    'Understands that items cost money',
+    'Uses money in simple role-play',
+    'Shows emerging responsibility with money',
+  ],
+  domesticbehaviour: [
+    'Helps in simple cleaning tasks',
+    'Keeps personal area neat',
+    'Puts toys/materials back after use',
+    'Helps set the table for meals',
+    'Helps clear dishes after meals',
+    'Follows simple home routines',
+    'Handles household items safely',
+    'Participates in simple chores',
+    'Follows safety rules at home',
+    'Shows responsibility with belongings',
+  ],
+  communityorientation: [
+    'Recognizes familiar places (school, home)',
+    'Identifies important people (teacher, doctor)',
+    'Follows rules in public places',
+    'Waits safely at roadside',
+    'Uses zebra crossing/footpath with help',
+    'Recognizes common symbols/signs',
+    'Stays with group on outings',
+    'Asks for help from safe adults',
+    'Behaves appropriately in public',
+    'Shows awareness of own address/school',
+  ],
+  recreation: [
+    'Participates in simple games',
+    'Chooses preferred leisure activities',
+    'Follows rules of simple games',
+    'Takes turns in play activities',
+    'Shares play materials with peers',
+    'Tries new recreational activities',
+    'Shows enjoyment during play',
+    'Stops play when time is over',
+    'Balances work and play time',
+    'Engages in age-appropriate hobbies',
+  ],
+  vocational: [
+    'Shows interest in work-like tasks',
+    'Follows simple work instructions',
+    'Completes assigned task with support',
+    'Uses basic tools safely',
+    'Sorts objects by type/size/color',
+    'Packs/unpacks simple materials',
+    'Maintains task focus for few minutes',
+    'Works as part of a small group',
+    'Accepts feedback on work',
+    'Shows readiness for further training',
+  ],
+};
+
+const SPECIAL_EDU_SKILLS = [
+  { key: 'grossmotor',          label: 'Gross Motor' },
+  { key: 'finemotor',           label: 'Fine Motor' },
+  { key: 'eating',              label: 'Eating' },
+  { key: 'dressing',            label: 'Dressing' },
+  { key: 'grooming',            label: 'Grooming' },
+  { key: 'toileting',           label: 'Toileting' },
+  { key: 'receptivelanguage',   label: 'Receptive Language' },
+  { key: 'expressivelanguage',  label: 'Expressive Language' },
+  { key: 'socialinteraction',   label: 'Social Interaction' },
+  { key: 'reading',             label: 'Reading' },
+  { key: 'writing',             label: 'Writing' },
+  { key: 'numbers',             label: 'Numbers' },
+  { key: 'time',                label: 'Time' },
+  { key: 'money',               label: 'Money' },
+  { key: 'domesticbehaviour',   label: 'Domestic Behaviour' },
+  { key: 'communityorientation',label: 'Community Orientation' },
+  { key: 'recreation',          label: 'Recreation' },
+  { key: 'vocational',          label: 'Vocational' },
+];
+
+const normalizeSectionKey = (label) =>
+  String(label || '')
+    .toLowerCase()
+    .normalize('NFKD')              // remove accents
+    .replace(/[\u0300-\u036f]/g, '')// strip diacritics
+    .replace(/[^a-z]/g, '');        // keep only letters
 const StudentPage = () => {
     // Refs for date pickers
     const startDateRef = useRef(null);
@@ -175,6 +421,7 @@ const StudentPage = () => {
   const [extractionData, setExtractionData] = useState(null);
   const [extractionSummary, setExtractionSummary] = useState(null);
   const fileInputRef = useRef(null);
+<<<<<<< Updated upstream
   
   // Translation state
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
@@ -242,6 +489,9 @@ const StudentPage = () => {
       setTranslating(false);
     }
   };
+=======
+  const [activeSkillByTable, setActiveSkillByTable] = useState({});
+>>>>>>> Stashed changes
 
   const handleAISummarize = async () => {
     setAiSummaryError(null);
@@ -1210,29 +1460,27 @@ useEffect(() => {
       const res = await axios.post(`${baseUrl}/api/v1/students/upload-report`, formData, config);
       const data = res.data;
       
-      if (data.success && data.tables && data.tables.length > 0) {
+            if (data.success && data.tables && data.tables.length > 0) {
+        const extractedAt = new Date().toISOString();
+      
+        // Enrich every table once
         const datedTables = data.tables.map(t => ({
           ...t,
           report_date: reportDate || null,
+          extracted_at: t.extracted_at || extractedAt,
         }));
-        setExtractedTables(data.tables);
+      
+        // Use enriched tables for current session
+        setExtractedTables(datedTables);
         setOcrMethod(data.method);
         setExtractionData(data.extracted_data || null);
         setExtractionSummary(data.extraction_summary || null);
       
-        // Append to per-student history and persist in localStorage
+        // Persist enriched tables in history
         try {
           const key = `special-education-tables:${id}`;
-          const extractedAt = new Date().toISOString();
-          
           setSavedTables(prev => {
-            // attach a date to each new table
-            const newTables = data.tables.map(t => ({
-              ...t,
-              extracted_at: extractedAt,
-            }));
-            const updated = [...prev, ...newTables];
-          
+            const updated = [...prev, ...datedTables];
             if (typeof window !== 'undefined') {
               window.localStorage.setItem(key, JSON.stringify(updated));
             }
@@ -3771,62 +4019,378 @@ const handleGenerateSummaryReport = () => {
                         </div>
                       </summary>
                   
-                      {/* Expanded content: table */}                  
-                      {/* Table Content */}
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              {table.headers
-                                ?.filter(
-                                  h =>
-                                    h !== 'Student Name' &&
-                                    h !== 'Register Number' &&
-                                    h !== 'Assessment Date'
-                                )
-                                .map((header, idx) => (
-                                  <th
-                                    key={idx}
-                                    className="px-2 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                      {(() => {
+                        if (!table.rows || !table.rows.length) return null;
+                      
+                        const headers =
+                          (table.headers && table.headers.length
+                            ? table.headers
+                            : Object.keys(table.rows[0] || {}));
+                      
+                        // Column that holds skill names (e.g. "Skill Area")
+                        const skillColumn =
+                          headers.find(h => String(h).toLowerCase().includes('skill')) || headers[0];
+                      
+                        // Session/question columns: everything except skill + metadata
+                        const sessionHeaders = headers.filter(h => {
+                          const raw = String(h || '').trim();
+                          const lower = raw.toLowerCase();
+                          const skillLower = String(skillColumn || '').trim().toLowerCase();
+                        
+                          if (!raw) return false;
+                          if (lower === skillLower) return false;
+                          if (lower === 'student name') return false;
+                          if (lower === 'register number') return false;
+                          if (lower === 'assessment date') return false;
+                          return true;
+                        });
+                        
+                        if (!sessionHeaders.length) return null;
+                      
+                        // Only show skills that actually exist in this table
+                        const availableSkills = SPECIAL_EDU_SKILLS.filter(s =>
+                          table.rows.some(row =>
+                            normalizeSectionKey(row[skillColumn]) === s.key
+                          )
+                        );
+                        if (!availableSkills.length) return null;
+                      
+                        const tableKey = tableIndex;
+                        const defaultKey = availableSkills[0].key;
+                        const activeKey = activeSkillByTable[tableKey] || defaultKey;
+                        const currentSkill =
+                          availableSkills.find(s => s.key === activeKey) || availableSkills[0];
+                      
+                        const questions = SPECIAL_EDU_QUESTIONS[currentSkill.key] || [];
+                      
+                        // Find the row index for the currently selected skill
+                        const skillRowIndex = table.rows.findIndex(row =>
+                          normalizeSectionKey(row[skillColumn]) === currentSkill.key
+                        );
+                        const skillRow = skillRowIndex >= 0 ? table.rows[skillRowIndex] : null;
+                      
+                        // When user clicks Yes/No, update that cell (A/B) in state + localStorage
+                        const handleToggleCell = (colName, newValue) => {
+                          if (!skillRow) return;
+                          setSavedTables(prev => {
+                            const updated = prev.map(t => {
+                              if (t !== table) return t;
+                              const rows = t.rows || [];
+                              const newRows = rows.map((row, idx) => {
+                                if (idx !== skillRowIndex) return row;
+                                return { ...row, [colName]: newValue };
+                              });
+                              return { ...t, rows: newRows };
+                            });
+                      
+                            try {
+                              if (typeof window !== 'undefined' && id) {
+                                window.localStorage.setItem(
+                                  `special-education-tables:${id}`,
+                                  JSON.stringify(updated)
+                                );
+                              }
+                            } catch (err) {
+                              console.warn('Failed to persist updated Special Education tables', err);
+                            }
+                      
+                            return updated;
+                          });
+                        };
+                      
+                        return (
+                          <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-xs font-semibold text-gray-700">
+                                Questionnaire (A = Yes, B = No)
+                              </h4>
+                            </div>
+                      
+                            {/* Clickable skills: Gross Motor, Fine Motor, ... */}
+                            <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+                              {availableSkills.map(skill => {
+                                const isActive = skill.key === activeKey;
+                                return (
+                                  <button
+                                    key={skill.key}
+                                    type="button"
+                                    onClick={e => {
+                                      e.preventDefault(); // don’t toggle <details>
+                                      setActiveSkillByTable(prev => ({
+                                        ...prev,
+                                        [tableKey]: skill.key,
+                                      }));
+                                    }}
+                                    className={
+                                      'px-3 py-1 rounded-full text-[11px] font-medium border transition-all ' +
+                                      (isActive
+                                        ? 'bg-[#E38B52] text-white border-[#E38B52] shadow-sm'
+                                        : 'bg-white text-[#170F49] border-gray-200 hover:bg-orange-50')
+                                    }
                                   >
-                                    {header.replace(/^Session\s+/i, '')}
-                                  </th>
-                                ))}
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {table.rows?.map((row, rowIdx) => (
-                              <tr key={rowIdx} className="hover:bg-gray-50">
-                                {table.headers
-                                  ?.filter(
-                                    h =>
-                                      h !== 'Student Name' &&
-                                      h !== 'Register Number' &&
-                                      h !== 'Assessment Date'
-                                  )
-                                  .map((header, cellIdx) => {
-                                    const cellValue = row[header] || '-';
-                                    const isA = cellValue === 'A';
-                                    const isB = cellValue === 'B';
-                                    return (
-                                      <td
-                                        key={cellIdx}
-                                        className={`px-2 py-1 whitespace-nowrap text-xs font-semibold ${
-                                          isA
-                                            ? 'text-blue-600'
-                                            : isB
-                                            ? 'text-red-600'
-                                            : 'text-gray-900'
-                                        }`}
+                                    {skill.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                      
+                            {/* Questions for the currently selected skill only */}
+                            <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
+                              {!skillRow ? (
+                                <div className="text-[11px] text-gray-500">
+                                  No data for {currentSkill.label} in this table.
+                                </div>
+                              ) : (
+                                <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                                  {questions
+                                    .slice(0, sessionHeaders.length)
+                                    .map((questionText, idx) => {
+                                      const colName = sessionHeaders[idx]; // "1", "2", ...
+                                      const rawValue = skillRow[colName];
+                                      const value =
+                                        typeof rawValue === 'string'
+                                          ? rawValue.trim().toUpperCase()
+                                          : '';
+                                      const isYes = value === 'A';
+                                      const isNo = value === 'B';
+                      
+                                      return (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center justify-between text-[11px] bg-gray-50 rounded-lg px-2 py-1 border border-gray-100"
+                                        >
+                                          <span className="mr-2 flex-1">
+                                            <span className="font-semibold mr-1">{idx + 1}.</span>
+                                            {questionText}
+                                          </span>
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            <span
+                                              role="button"
+                                              onClick={() => handleToggleCell(colName, 'A')}
+                                              className={
+                                                'px-2 py-[1px] rounded-full border text-[10px] cursor-pointer ' +
+                                                (isYes
+                                                  ? 'bg-green-100 text-green-700 border-green-300'
+                                                  : 'text-gray-500 border-gray-200 hover:bg-green-50')
+                                              }
+                                            >
+                                              Yes
+                                            </span>
+                                            <span
+                                              role="button"
+                                              onClick={() => handleToggleCell(colName, 'B')}
+                                              className={
+                                                'px-2 py-[1px] rounded-full border text-[10px] cursor-pointer ' +
+                                                (isNo
+                                                  ? 'bg-red-100 text-red-700 border-red-300'
+                                                  : 'text-gray-500 border-gray-200 hover:bg-red-50')
+                                              }
+                                            >
+                                              No
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      
+                      {/* Original table view (unchanged A/B grid) */}
+                                            {/* Original table view with grouped totals/quarters */}
+                      <div className="overflow-x-auto">
+                        {(() => {
+                          const rawHeaders =
+                            (table.headers && table.headers.length
+                              ? table.headers
+                              : (table.rows && table.rows.length
+                                  ? Object.keys(table.rows[0] || {})
+                                  : []));
+                          // Drop non-data columns
+                          const allHeaders = rawHeaders.filter(
+                            h =>
+                              h !== 'Student Name' &&
+                              h !== 'Register Number' &&
+                              h !== 'Assessment Date'
+                          );
+                      
+                          const normalize = h =>
+                            String(h || '')
+                              .toLowerCase()
+                              .replace(/\s+/g, '')
+                              .replace(/[^a-z0-9]/g, '');
+                      
+                          // Detect summary columns by name
+                          const totalAKey = allHeaders.find(h => normalize(h) === 'totala');
+                          const totalBKey = allHeaders.find(h => normalize(h) === 'totalb');
+                      
+                          const quarterDefs = [
+                            { pattern: 'iqr', label: 'I Qr' },
+                            { pattern: 'iiqr', label: 'II Qr' },
+                            { pattern: 'iiiqr', label: 'III Qr' },
+                            { pattern: 'ivqr', label: 'IV Qr' },
+                          ];
+                          const quarterKeys = quarterDefs.map(def => ({
+                            def,
+                            key: allHeaders.find(h => normalize(h) === def.pattern) || null,
+                          }));
+                      
+                          // Base (skill + 1..20 etc.), excluding summary cols
+                          const summarySet = new Set(
+                            [totalAKey, totalBKey, ...quarterKeys.map(q => q.key)].filter(Boolean)
+                          );
+                          const baseHeaders = allHeaders.filter(h => !summarySet.has(h));
+                      
+                          // Build leaf columns (second header row + body)
+                          const leafColumns = [];
+                      
+                          // Base columns: one cell, spanning both header rows
+                          baseHeaders.forEach(h => {
+                            leafColumns.push({
+                              group: null,
+                              header: String(h).replace(/^Session\s+/i, ''),
+                              subLabel: null,
+                              getValue: row => row[h],
+                            });
+                          });
+                      
+                          // 1st Assessment group: TOTAL A / TOTAL B
+                          if (totalAKey || totalBKey) {
+                            if (totalAKey) {
+                              leafColumns.push({
+                                group: '1st Assmt',
+                                header: 'A',
+                                subLabel: 'A',
+                                getValue: row => row[totalAKey],
+                              });
+                            }
+                            if (totalBKey) {
+                              leafColumns.push({
+                                group: '1st Assmt',
+                                header: 'B',
+                                subLabel: 'B',
+                                getValue: row => row[totalBKey],
+                              });
+                            }
+                          }
+                      
+                          // Quarter groups: for now, show existing value under A, leave B empty
+                          quarterKeys.forEach(({ def, key }) => {
+                            if (!key) return;
+                            leafColumns.push({
+                              group: def.label,
+                              header: 'A',
+                              subLabel: 'A',
+                              getValue: row => row[key],
+                            });
+                            leafColumns.push({
+                              group: def.label,
+                              header: 'B',
+                              subLabel: 'B',
+                              getValue: () => '',
+                            });
+                          });
+                      
+                          if (!leafColumns.length) return null;
+                      
+                          return (
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                {/* Top header row: base cols (rowSpan=2) + grouped headings */}
+                                <tr>
+                                  {(() => {
+                                    const cells = [];
+                                    let i = 0;
+                                    while (i < leafColumns.length) {
+                                      const col = leafColumns[i];
+                                      if (!col.group) {
+                                        // Simple column spanning both header rows
+                                        cells.push(
+                                          <th
+                                            key={`h1-${i}`}
+                                            rowSpan={2}
+                                            className="px-2 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                                          >
+                                            {col.header}
+                                          </th>
+                                        );
+                                        i += 1;
+                                        continue;
+                                      }
+                                      // Grouped columns (1st Assessment, I Qr, …)
+                                      const group = col.group;
+                                      let span = 0;
+                                      while (
+                                        i + span < leafColumns.length &&
+                                        leafColumns[i + span].group === group
+                                      ) {
+                                        span += 1;
+                                      }
+                                      cells.push(
+                                        <th
+                                          key={`group-${group}-${i}`}
+                                          colSpan={span}
+                                          className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-600 uppercase tracking-wider"
+                                        >
+                                          {group}
+                                        </th>
+                                      );
+                                      i += span;
+                                    }
+                                    return cells;
+                                  })()}
+                                </tr>
+                                {/* Second header row: A/B under each grouped heading */}
+                                <tr>
+                                  {leafColumns.map((col, idx) =>
+                                    col.group ? (
+                                      <th
+                                        key={`h2-${idx}`}
+                                        className="px-2 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider"
                                       >
-                                        {cellValue}
-                                      </td>
-                                    );
-                                  })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                        {col.subLabel || col.header}
+                                      </th>
+                                    ) : null
+                                  )}
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {table.rows?.map((row, rowIdx) => (
+                                  <tr key={rowIdx} className="hover:bg-gray-50">
+                                    {leafColumns.map((col, cellIdx) => {
+                                      const raw = col.getValue(row);
+                                      const cellValue =
+                                        raw === undefined || raw === null || raw === ''
+                                          ? '-'
+                                          : raw;
+                                      const isA = cellValue === 'A';
+                                      const isB = cellValue === 'B';
+                                      return (
+                                        <td
+                                          key={cellIdx}
+                                          className={`px-2 py-1 whitespace-nowrap text-xs font-semibold ${
+                                            col.group ? 'text-center' : 'text-left'
+                                          } ${
+                                            isA
+                                              ? 'text-blue-600'
+                                              : isB
+                                              ? 'text-red-600'
+                                              : 'text-gray-900'
+                                          }`}
+                                        >
+                                          {cellValue}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          );
+                        })()}
                       </div>
                     </details>
                   ))}
