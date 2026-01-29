@@ -175,6 +175,73 @@ const StudentPage = () => {
   const [extractionData, setExtractionData] = useState(null);
   const [extractionSummary, setExtractionSummary] = useState(null);
   const fileInputRef = useRef(null);
+  
+  // Translation state
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translatedSummary, setTranslatedSummary] = useState(null);
+  const [selectedLanguage, setSelectedLanguage] = useState(null);
+
+  // Handle translation
+  const handleTranslate = async (targetLanguage) => {
+    setTranslating(true);
+    setShowLanguageSelector(false);
+    setSelectedLanguage(targetLanguage);
+    
+    try {
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+      const token = localStorage.getItem("token");
+      
+      // Get the AI summary text
+      const summaryText = aiAnalysis?.summary || '';
+      
+      console.log("=== TRANSLATION REQUEST ===");
+      console.log("Target Language:", targetLanguage);
+      console.log("Summary Text Length:", summaryText.length, "characters");
+      console.log("Summary Preview:", summaryText.substring(0, 100) + "...");
+      
+      if (!summaryText.trim()) {
+        throw new Error("No AI summary available to translate. Please generate AI summary first.");
+      }
+      
+      if (!token) {
+        throw new Error("No authentication token found. Please log in again.");
+      }
+      
+      const res = await fetch(`${baseUrl}/api/v1/translate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          text: summaryText,
+          target_language: targetLanguage,
+          source_language: "eng_Latn"
+        })
+      });
+      
+      console.log("Translation response status:", res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Translation error response:", errorData);
+        throw new Error(errorData.detail || `Translation failed: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log("✓ Translation successful");
+      console.log("Translated Preview:", data.translated_text.substring(0, 100) + "...");
+      setTranslatedSummary(data.translated_text);
+    } catch (e) {
+      console.error('Translation error:', e);
+      alert(`Translation failed: ${e.message}`);
+      setTranslatedSummary(null);
+      setSelectedLanguage(null);
+    } finally {
+      setTranslating(false);
+    }
+  };
 
   const handleAISummarize = async () => {
     setAiSummaryError(null);
@@ -2034,7 +2101,7 @@ const handleGenerateSummaryReport = () => {
                       </div>
                       <div className="flex flex-row items-center min-w-[140px] gap-2">
                         <span className="text-sm font-semibold text-gray-700">End Date</span>
-                        <div className="relative flex items-center h-10">
+                        <div className="relative flex items-center">
                           <input
                             ref={endDateRef}
                             type="date"
@@ -2479,15 +2546,83 @@ const handleGenerateSummaryReport = () => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {aiAnalysis && !aiSummarizing && (
-                              <button onClick={generateAIAnalysisPDF} className="ml-auto px-3 py-2 border-2 border-[#E38B52] text-[#E38B52] text-sm rounded-xl bg-white hover:bg-orange-50 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold" title="Download AI Analysis Report as PDF">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 8l-4-4m4 4l4-4M4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                Summary
-                              </button>
+                              <>
+                                <button onClick={generateAIAnalysisPDF} className="ml-auto px-3 py-2 border-2 border-[#E38B52] text-[#E38B52] text-sm rounded-xl bg-white hover:bg-orange-50 active:scale-95 active:bg-orange-100 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold" title="Download AI Analysis Report as PDF">
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 8l-4-4m4 4l4-4M4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  Summary
+                                </button>
+                                <button onClick={() => setShowLanguageSelector(!showLanguageSelector)} className="ml-2 px-3 py-2 border-2 border-[#E38B52] text-[#E38B52] text-sm rounded-xl bg-white hover:bg-orange-50 active:scale-95 active:bg-orange-100 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold" title="Translate Progress Summary">
+                                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="10" stroke="#E38B52" strokeWidth="2" fill="#fff" />
+                                    <path d="M2 12h20" stroke="#E38B52" strokeWidth="2" />
+                                    <path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" stroke="#E38B52" strokeWidth="2" fill="none" />
+                                  </svg>
+                                  {translating ? 'Translating...' : 'Translate'}
+                                </button>
+                              </>
                             )}
                           </h4>
-                          <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap max-h-96 overflow-auto prose prose-sm max-w-none">{aiAnalysis?.summary || 'No progress summary available'}</div>
+                          
+                          {/* Language Selector Modal */}
+                          {showLanguageSelector && (
+                            <div className="absolute top-16 right-0 z-50 bg-white rounded-xl shadow-2xl border-2 border-[#E38B52] p-4 w-64">
+                              <h5 className="font-bold text-gray-800 mb-3 text-sm">Select Language:</h5>
+                              <div className="space-y-2 max-h-80 overflow-y-auto">
+                                {[
+                                  { code: 'mal_Mlym', name: 'Malayalam (മലയാളം)' },
+                                  { code: 'hin_Deva', name: 'Hindi (हिन्दी)' },
+                                  { code: 'tam_Tamil', name: 'Tamil (தமிழ்)' },
+                                  { code: 'tel_Telu', name: 'Telugu (తెలుగు)' },
+                                  { code: 'kan_Knda', name: 'Kannada (ಕನ್ನಡ)' },
+                                  { code: 'ben_Beng', name: 'Bengali (বাংলা)' },
+                                  { code: 'guj_Gujr', name: 'Gujarati (ગુજરાતી)' },
+                                  { code: 'mar_Deva', name: 'Marathi (मराठी)' },
+                                  { code: 'pan_Guru', name: 'Punjabi (ਪੰਜਾਬੀ)' },
+                                  { code: 'ory_Orya', name: 'Odia (ଓଡ଼ିଆ)' },
+                                ].map(lang => (
+                                  <button
+                                    key={lang.code}
+                                    onClick={() => handleTranslate(lang.code)}
+                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-orange-50 border border-gray-200 hover:border-[#E38B52] transition-all duration-150 text-sm font-medium text-gray-700 hover:text-[#E38B52]"
+                                  >
+                                    {lang.name}
+                                  </button>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => setShowLanguageSelector(false)}
+                                className="mt-3 w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-all"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                          
+                          <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap max-h-96 overflow-auto prose prose-sm max-w-none">
+                            {translating ? (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>
+                                Translating to {selectedLanguage}...
+                              </div>
+                            ) : translatedSummary ? (
+                              <div>
+                                <div className="flex items-center justify-between mb-3 pb-2 border-b border-orange-200">
+                                  <span className="text-xs font-semibold text-[#E38B52] uppercase">Translated ({selectedLanguage})</span>
+                                  <button
+                                    onClick={() => { setTranslatedSummary(null); setSelectedLanguage(null); }}
+                                    className="text-xs text-gray-500 hover:text-[#E38B52] underline"
+                                  >
+                                    Show Original
+                                  </button>
+                                </div>
+                                {translatedSummary}
+                              </div>
+                            ) : (
+                              aiAnalysis?.summary || 'No progress summary available'
+                            )}
+                          </div>
                           {aiAnalysis?.truncated && (<div className="mt-3 text-xs text-orange-700 bg-orange-50 p-2 rounded border border-orange-200">⚠️ Analysis was truncated due to content length. Consider filtering by date range for more detailed analysis.</div>)}
                         </div>
                         

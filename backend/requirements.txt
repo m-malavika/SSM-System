@@ -31,4 +31,10 @@ img2table==1.2.5
 pytesseract==0.3.10
 Pillow==10.1.0
 opencv-python-headless==4.8.1.78
-numpy==1.24.3 
+numpy==1.24.3
+
+# Translation - IndicTrans2
+transformers>=4.35.0
+torch>=2.0.0
+sentencepiece>=0.1.99
+sacremoses>=0.0.53 
