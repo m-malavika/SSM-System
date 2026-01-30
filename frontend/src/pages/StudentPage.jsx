@@ -385,6 +385,7 @@ const normalizeSectionKey = (label) =>
     .normalize('NFKD')              // remove accents
     .replace(/[\u0300-\u036f]/g, '')// strip diacritics
     .replace(/[^a-z]/g, '');        // keep only letters
+
 const StudentPage = () => {
     // Refs for date pickers
     const startDateRef = useRef(null);
@@ -421,40 +422,33 @@ const StudentPage = () => {
   const [extractionData, setExtractionData] = useState(null);
   const [extractionSummary, setExtractionSummary] = useState(null);
   const fileInputRef = useRef(null);
-<<<<<<< Updated upstream
   
   // Translation state
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [translatedSummary, setTranslatedSummary] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState(null);
-
+  
   // Handle translation
   const handleTranslate = async (targetLanguage) => {
     setTranslating(true);
     setShowLanguageSelector(false);
     setSelectedLanguage(targetLanguage);
-    
+  
     try {
       const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
       const token = localStorage.getItem("token");
-      
-      // Get the AI summary text
+  
       const summaryText = aiAnalysis?.summary || '';
-      
-      console.log("=== TRANSLATION REQUEST ===");
-      console.log("Target Language:", targetLanguage);
-      console.log("Summary Text Length:", summaryText.length, "characters");
-      console.log("Summary Preview:", summaryText.substring(0, 100) + "...");
-      
+  
       if (!summaryText.trim()) {
         throw new Error("No AI summary available to translate. Please generate AI summary first.");
       }
-      
+  
       if (!token) {
         throw new Error("No authentication token found. Please log in again.");
       }
-      
+  
       const res = await fetch(`${baseUrl}/api/v1/translate`, {
         method: "POST",
         headers: {
@@ -467,21 +461,15 @@ const StudentPage = () => {
           source_language: "eng_Latn"
         })
       });
-      
-      console.log("Translation response status:", res.status);
-      
+  
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        console.error("Translation error response:", errorData);
         throw new Error(errorData.detail || `Translation failed: ${res.status}`);
       }
-      
+  
       const data = await res.json();
-      console.log("✓ Translation successful");
-      console.log("Translated Preview:", data.translated_text.substring(0, 100) + "...");
       setTranslatedSummary(data.translated_text);
     } catch (e) {
-      console.error('Translation error:', e);
       alert(`Translation failed: ${e.message}`);
       setTranslatedSummary(null);
       setSelectedLanguage(null);
@@ -489,9 +477,8 @@ const StudentPage = () => {
       setTranslating(false);
     }
   };
-=======
+  
   const [activeSkillByTable, setActiveSkillByTable] = useState({});
->>>>>>> Stashed changes
 
   const handleAISummarize = async () => {
     setAiSummaryError(null);
