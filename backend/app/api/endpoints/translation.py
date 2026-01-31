@@ -1,5 +1,6 @@
 """
-Translation endpoint using NLLB-200 for Malayalam and Helsinki-NLP for other Indian languages
+Translation endpoint using CTranslate2 INT8 quantized NLLB-200 for Malayalam (5-10x faster)
+and Helsinki-NLP for other Indian languages
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -7,22 +8,35 @@ from typing import Optional
 from app.api.deps import get_current_user
 from app.models.user import User
 import logging
+import time
+import os
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Global cache for CTranslate2 models
+_ct2_translator = None
+_ct2_tokenizer = None
+_translation_model = None
+_tokenizer = None
+_device = None
+
+# Path for converted CTranslate2 model
+CT2_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "models", "nllb-200-distilled-600M-int8")
+
 @router.post("/clear-translation-cache")
 async def clear_translation_cache(current_user: User = Depends(get_current_user)):
     """Force clear translation models cache - requires restart to take effect"""
-    global _translation_model, _tokenizer, _nllb_model, _nllb_tokenizer
+    global _ct2_translator, _ct2_tokenizer, _translation_model, _tokenizer, _device
     
-    old_type = "NLLB/Helsinki" if _translation_model or _nllb_model else "None"
+    old_type = "CTranslate2" if _ct2_translator else ("Helsinki" if _translation_model else "None")
     
+    _ct2_translator = None
+    _ct2_tokenizer = None
     _translation_model = None
     _tokenizer = None
-    _nllb_model = None
-    _nllb_tokenizer = None
+    _device = None
     
     logger.info(f"Translation model cache cleared (was: {old_type})")
     return {
@@ -42,60 +56,103 @@ class TranslationResponse(BaseModel):
     source_language: str
     target_language: str
 
-# Lazy load the translation models
-_translation_model = None
-_tokenizer = None
-_nllb_model = None
-_nllb_tokenizer = None
 
-def get_nllb_model():
-    """
-    Lazy load Facebook NLLB-200-distilled-600M model for Malayalam translation
-    """
-    global _nllb_model, _nllb_tokenizer
+def _convert_nllb_to_ct2():
+    """Convert NLLB model to CTranslate2 INT8 format (one-time operation)"""
+    import ctranslate2
     
-    if _nllb_model is None:
-        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+    logger.info("Converting NLLB-200-distilled-600M to CTranslate2 INT8 format...")
+    logger.info("This is a one-time operation and will take a few minutes...")
+    
+    start_time = time.time()
+    
+    # Create models directory if it doesn't exist
+    os.makedirs(os.path.dirname(CT2_MODEL_PATH), exist_ok=True)
+    
+    # Convert using ctranslate2 converter
+    ctranslate2.converters.TransformersConverter(
+        "facebook/nllb-200-distilled-600M"
+    ).convert(
+        CT2_MODEL_PATH,
+        quantization="int8",  # INT8 quantization for 4x speed + smaller size
+        force=True
+    )
+    
+    elapsed = time.time() - start_time
+    logger.info(f"✓ Model converted to CTranslate2 INT8 in {elapsed:.1f}s")
+    logger.info(f"  Saved to: {CT2_MODEL_PATH}")
+
+
+def get_ct2_nllb_model():
+    """
+    Load CTranslate2 INT8 quantized NLLB model for Malayalam translation
+    MAXIMUM SPEED: Optimized for fastest possible inference
+    """
+    global _ct2_translator, _ct2_tokenizer, _device
+    
+    if _ct2_translator is None:
+        import ctranslate2
+        from transformers import NllbTokenizerFast
         import torch
+        import multiprocessing
         
-        model_name = "facebook/nllb-200-distilled-600M"
-        logger.info(f"Loading NLLB model: {model_name}")
+        start_time = time.time()
         
-        _nllb_tokenizer = AutoTokenizer.from_pretrained(model_name)
-        _nllb_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        # Check if converted model exists, if not convert it
+        if not os.path.exists(CT2_MODEL_PATH):
+            _convert_nllb_to_ct2()
         
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        _nllb_model = _nllb_model.to(device)
-        logger.info(f"✓ NLLB-200 model loaded on {device}")
+        # Determine device
+        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        # Get optimal thread count
+        cpu_count = multiprocessing.cpu_count()
+        
+        logger.info(f"Loading CTranslate2 INT8 NLLB model on {_device} with {cpu_count} threads...")
+        
+        # MAXIMUM SPEED settings
+        _ct2_translator = ctranslate2.Translator(
+            CT2_MODEL_PATH,
+            device=_device,
+            compute_type="int8",
+            inter_threads=cpu_count,
+            intra_threads=2,  # Some intra-op parallelism helps
+        )
+        
+        # Use FAST tokenizer (2-5x faster tokenization)
+        _ct2_tokenizer = NllbTokenizerFast.from_pretrained(
+            "facebook/nllb-200-distilled-600M",
+            use_fast=True
+        )
+        
+        # Warm up the model (first inference is slow)
+        logger.info("Warming up model...")
+        _ct2_tokenizer.src_lang = "eng_Latn"
+        warmup_tokens = _ct2_tokenizer("Hello", return_tensors=None)["input_ids"]
+        warmup_tokens = _ct2_tokenizer.convert_ids_to_tokens(warmup_tokens)
+        _ct2_translator.translate_batch([warmup_tokens], target_prefix=[["mal_Mlym"]], beam_size=1)
+        
+        load_time = time.time() - start_time
+        logger.info(f"✓ CTranslate2 INT8 NLLB model loaded and warmed up in {load_time:.1f}s")
     
-    return _nllb_model, _nllb_tokenizer
+    return _ct2_translator, _ct2_tokenizer, _device
 
-def get_translation_model():
-    """
-    Lazy load translation model - uses Helsinki-NLP for non-Malayalam languages
-    """
-    global _translation_model, _tokenizer
-    
-    if _translation_model is None:
-        logger.info("Using Helsinki-NLP models for translation (non-Malayalam)")
-        _translation_model = {}
-        _tokenizer = {}
-        logger.info("✓ Translation models ready (Helsinki-NLP)")
-        return _translation_model, _tokenizer, "helsinki"
-    
-    logger.debug("Using Helsinki-NLP models")
-    return _translation_model, _tokenizer, "helsinki"
 
 def get_model_for_language(target_lang):
-    """Get or load the appropriate model for the target language (non-Malayalam)"""
+    """Get or load the appropriate model for the target language (non-Malayalam)
+    OPTIMIZED: Uses half-precision on GPU and eval mode
+    """
     from transformers import MarianMTModel, MarianTokenizer
     import torch
     
-    global _translation_model, _tokenizer
+    global _translation_model, _tokenizer, _device
     
     if _translation_model is None:
         _translation_model = {}
         _tokenizer = {}
+    
+    if _device is None:
+        _device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # Model mapping for each language (excluding Malayalam - uses NLLB)
     model_map = {
@@ -115,13 +172,20 @@ def get_model_for_language(target_lang):
     if target_lang not in _translation_model:
         logger.info(f"Loading model for {target_lang}: {model_name}")
         _tokenizer[target_lang] = MarianTokenizer.from_pretrained(model_name)
-        _translation_model[target_lang] = MarianMTModel.from_pretrained(model_name)
         
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        _translation_model[target_lang] = _translation_model[target_lang].to(device)
-        logger.info(f"Model for {target_lang} loaded on {device}")
+        use_half = _device == "cuda"
+        if use_half:
+            _translation_model[target_lang] = MarianMTModel.from_pretrained(
+                model_name,
+                torch_dtype=torch.float16
+            ).to(_device)
+        else:
+            _translation_model[target_lang] = MarianMTModel.from_pretrained(model_name).to(_device)
+        
+        _translation_model[target_lang].eval()
+        logger.info(f"Model for {target_lang} loaded on {_device} (half={use_half})")
     
-    return _translation_model[target_lang], _tokenizer[target_lang]
+    return _translation_model[target_lang], _tokenizer[target_lang], _device
 
 @router.post("/translate", response_model=TranslationResponse)
 async def translate_text(
@@ -130,9 +194,10 @@ async def translate_text(
 ):
     """
     Translate text from English to Indian languages
+    ULTRA-FAST: Uses CTranslate2 INT8 quantized NLLB-200 (5-10x faster than PyTorch)
     
     Supported language codes:
-    - mal_Mlym: Malayalam (ml) - Uses Facebook NLLB-200-distilled-600M
+    - mal_Mlym: Malayalam (ml) - Uses CTranslate2 INT8 NLLB-200
     - hin_Deva: Hindi (hi) - Uses Helsinki-NLP
     - tam_Tamil: Tamil (ta) - Uses Helsinki-NLP
     - tel_Telu: Telugu (te) - Uses Helsinki-NLP
@@ -144,6 +209,7 @@ async def translate_text(
     - ory_Orya: Odia (or) - Uses Helsinki-NLP
     """
     try:
+        start_time = time.time()
         logger.info(f"Translation request from user {current_user.username} to {request.target_language}")
         logger.info(f"Text length: {len(request.text)} characters")
         
@@ -153,7 +219,6 @@ async def translate_text(
         # Validate text length (AI summaries are typically 100-2000 chars)
         if len(request.text) > 5000:
             logger.warning(f"Large text received: {len(request.text)} chars")
-            # Truncate if too large
             request.text = request.text[:5000]
             logger.info("Text truncated to 5000 characters")
         
@@ -173,104 +238,116 @@ async def translate_text(
         
         target_lang = language_map.get(request.target_language, request.target_language)
         
-        import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        
-        # Use NLLB-200 for Malayalam, Helsinki-NLP for others
+        # Use CTranslate2 INT8 NLLB for Malayalam, Helsinki-NLP for others
         if target_lang == "ml":
-            logger.info("Using Facebook NLLB-200-distilled-600M for Malayalam translation")
-            model, tokenizer = get_nllb_model()
+            logger.info("Using CTranslate2 INT8 NLLB-200 for Malayalam (ultra-fast)")
+            translator, tokenizer, device = get_ct2_nllb_model()
             
             # NLLB language codes
-            src_lang = "eng_Latn"  # English
-            tgt_lang = "mal_Mlym"  # Malayalam
+            src_lang = "eng_Latn"
+            tgt_lang = "mal_Mlym"
             
             # Set source language for tokenizer
             tokenizer.src_lang = src_lang
             
-            # Split text into chunks by double newlines (paragraphs) to preserve structure
-            # but translate in batches for speed
-            paragraphs = request.text.split('\n')
+            text_to_translate = request.text.strip()
             
-            # Filter out empty lines but track their positions
-            non_empty_paragraphs = []
-            paragraph_indices = []
-            for i, p in enumerate(paragraphs):
-                if p.strip():
-                    non_empty_paragraphs.append(p.strip())
-                    paragraph_indices.append(i)
+            # MAXIMUM SPEED: Merge into larger chunks (fewer translations = faster)
+            # Split by double newlines (paragraphs) to preserve major structure
+            paragraphs = text_to_translate.split('\n\n')
             
-            logger.info(f"Translating {len(non_empty_paragraphs)} paragraphs to Malayalam (batch mode)")
-            
-            # Batch translate all non-empty paragraphs at once
-            if non_empty_paragraphs:
-                inputs = tokenizer(
-                    non_empty_paragraphs,
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    max_length=128  # Shorter per-paragraph limit
-                ).to(device)
-                
-                # Generate translations for all paragraphs in one batch
-                with torch.no_grad():
-                    outputs = model.generate(
-                        **inputs,
-                        forced_bos_token_id=tokenizer.convert_tokens_to_ids(tgt_lang),
-                        max_new_tokens=150,  # Sufficient for paragraph translation
-                        num_beams=2,  # Faster with minimal quality loss
-                        do_sample=False,
-                        no_repeat_ngram_size=2,
-                    )
-                
-                # Decode all translations
-                translated_paragraphs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-                
-                # Reconstruct with original line structure
-                result_lines = [''] * len(paragraphs)
-                for idx, orig_idx in enumerate(paragraph_indices):
-                    result_lines[orig_idx] = translated_paragraphs[idx]
-                
-                translated_text = '\n'.join(result_lines)
+            if not paragraphs or (len(paragraphs) == 1 and not paragraphs[0].strip()):
+                translated_text = ""
             else:
-                translated_text = request.text
+                # Filter and prepare paragraphs
+                para_map = []  # (index, content) for non-empty paragraphs
+                for i, para in enumerate(paragraphs):
+                    stripped = para.strip()
+                    if stripped:
+                        # Replace internal newlines with space to make single chunk
+                        merged = ' '.join(stripped.split('\n'))
+                        para_map.append((i, merged))
+                
+                if not para_map:
+                    translated_text = ""
+                else:
+                    logger.info(f"Translating {len(para_map)} paragraphs (merged for speed)")
+                    
+                    # FAST batch tokenization using list comprehension
+                    all_source_tokens = [
+                        tokenizer.convert_ids_to_tokens(
+                            tokenizer(content, return_tensors=None, add_special_tokens=True)["input_ids"]
+                        )
+                        for _, content in para_map
+                    ]
+                    
+                    # Single optimized batch call
+                    results = translator.translate_batch(
+                        all_source_tokens,
+                        target_prefix=[[tgt_lang]] * len(para_map),
+                        beam_size=1,  # Greedy = fastest
+                        max_decoding_length=400,
+                        replace_unknowns=True,
+                        max_batch_size=0,  # 0 = no limit, process all at once
+                        batch_type="tokens",  # Batch by tokens for better GPU/CPU utilization
+                    )
+                    
+                    # Fast batch decode using list comprehension
+                    translated_paras = [
+                        tokenizer.decode(
+                            tokenizer.convert_tokens_to_ids(
+                                r.hypotheses[0][1:] if r.hypotheses[0] and r.hypotheses[0][0] == tgt_lang else r.hypotheses[0]
+                            ),
+                            skip_special_tokens=True
+                        )
+                        for r in results
+                    ]
+                    
+                    # Reconstruct with paragraph structure
+                    result_paras = [''] * len(paragraphs)
+                    for idx, (orig_idx, _) in enumerate(para_map):
+                        result_paras[orig_idx] = translated_paras[idx]
+                    
+                    translated_text = '\n\n'.join(result_paras)
             
-            logger.info(f"NLLB Translation complete: {len(translated_text)} characters")
+            elapsed = time.time() - start_time
+            logger.info(f"CTranslate2 INT8 Translation complete: {len(translated_text)} chars in {elapsed:.2f}s")
         else:
             logger.info(f"Using Helsinki-NLP model for translation to {target_lang}")
+            import torch
             
             # Get language-specific Helsinki model
-            model, tokenizer = get_model_for_language(target_lang)
+            model, tokenizer, device = get_model_for_language(target_lang)
             
-            # Tokenize input with increased limits for full summaries
+            # Tokenize input
             inputs = tokenizer(
                 request.text,
                 return_tensors="pt",
-                padding=True,
+                padding=False,
                 truncation=True,
-                max_length=512  # Helsinki models work best with 512 max
+                max_length=512
             ).to(device)
             
             logger.info(f"Input tokens: {inputs['input_ids'].shape[1]}")
             
-            # Generate translation with increased output length
-            with torch.no_grad():
+            # OPTIMIZED: Use greedy decoding for speed
+            with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device == "cuda")):
                 outputs = model.generate(
                     **inputs,
                     max_length=512,
-                    num_beams=5,
-                    early_stopping=True,
-                    no_repeat_ngram_size=3
+                    num_beams=1,  # Greedy decoding - much faster
+                    do_sample=False,
+                    use_cache=True,
                 )
             
-            # Decode translation
             translated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            logger.info(f"Helsinki Translation output: {len(translated_text)} characters")
+            elapsed = time.time() - start_time
+            logger.info(f"Helsinki Translation complete: {len(translated_text)} chars in {elapsed:.2f}s")
         
-        logger.info("Translation completed successfully")
+        logger.info(f"Translation completed successfully in {time.time() - start_time:.2f}s")
         logger.info(f"Translated text preview: {translated_text[:100]}...")
         
-        # Validate translation actually happened (check for target language characters)
+        # Validate translation actually happened
         has_translation = len(translated_text) > 0 and translated_text != request.text
         if not has_translation:
             logger.warning("Translation may not have worked - output matches input")

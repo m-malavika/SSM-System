@@ -171,3 +171,16 @@ frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
 # Note: Most other rules from frontend/.gitignore were already covered above or are general.
+
+# ============================================================
+# Machine Learning Models (too large for Git)
+# ============================================================
+backend/models/
+backend/ct2_models/
+*.bin
+*.onnx
+*.pb
+*.pt
+*.pth
+*.h5
+*.safetensors
