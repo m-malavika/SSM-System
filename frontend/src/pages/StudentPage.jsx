@@ -424,16 +424,12 @@ const StudentPage = () => {
   const fileInputRef = useRef(null);
   
   // Translation state
-  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [translatedSummary, setTranslatedSummary] = useState(null);
-  const [selectedLanguage, setSelectedLanguage] = useState(null);
   
-  // Handle translation
-  const handleTranslate = async (targetLanguage) => {
+  // Handle translation - always translates to Malayalam
+  const handleTranslate = async () => {
     setTranslating(true);
-    setShowLanguageSelector(false);
-    setSelectedLanguage(targetLanguage);
   
     try {
       const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -457,7 +453,7 @@ const StudentPage = () => {
         },
         body: JSON.stringify({
           text: summaryText,
-          target_language: targetLanguage,
+          target_language: "mal_Mlym",
           source_language: "eng_Latn"
         })
       });
@@ -472,7 +468,6 @@ const StudentPage = () => {
     } catch (e) {
       alert(`Translation failed: ${e.message}`);
       setTranslatedSummary(null);
-      setSelectedLanguage(null);
     } finally {
       setTranslating(false);
     }
@@ -2788,71 +2783,36 @@ const handleGenerateSummaryReport = () => {
                                   </svg>
                                   Summary
                                 </button>
-                                <button onClick={() => setShowLanguageSelector(!showLanguageSelector)} className="ml-2 px-3 py-2 border-2 border-[#E38B52] text-[#E38B52] text-sm rounded-xl bg-white hover:bg-orange-50 active:scale-95 active:bg-orange-100 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold" title="Translate Progress Summary">
+                                <button onClick={() => handleTranslate()} disabled={translating} className="ml-2 px-3 py-2 border-2 border-[#E38B52] text-[#E38B52] text-sm rounded-xl bg-white hover:bg-orange-50 active:scale-95 active:bg-orange-100 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold disabled:opacity-50 disabled:cursor-not-allowed" title="Translate to Malayalam">
                                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <circle cx="12" cy="12" r="10" stroke="#E38B52" strokeWidth="2" fill="#fff" />
                                     <path d="M2 12h20" stroke="#E38B52" strokeWidth="2" />
                                     <path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" stroke="#E38B52" strokeWidth="2" fill="none" />
                                   </svg>
-                                  {translating ? 'Translating...' : 'Translate'}
+                                  {translating ? 'Translating...' : 'Malayalam'}
                                 </button>
                               </>
                             )}
                           </h4>
                           
-                          {/* Language Selector Modal */}
-                          {showLanguageSelector && (
-                            <div className="absolute top-16 right-0 z-50 bg-white rounded-xl shadow-2xl border-2 border-[#E38B52] p-4 w-64">
-                              <h5 className="font-bold text-gray-800 mb-3 text-sm">Select Language:</h5>
-                              <div className="space-y-2 max-h-80 overflow-y-auto">
-                                {[
-                                  { code: 'mal_Mlym', name: 'Malayalam (മലയാളം)' },
-                                  { code: 'hin_Deva', name: 'Hindi (हिन्दी)' },
-                                  { code: 'tam_Tamil', name: 'Tamil (தமிழ்)' },
-                                  { code: 'tel_Telu', name: 'Telugu (తెలుగు)' },
-                                  { code: 'kan_Knda', name: 'Kannada (ಕನ್ನಡ)' },
-                                  { code: 'ben_Beng', name: 'Bengali (বাংলা)' },
-                                  { code: 'guj_Gujr', name: 'Gujarati (ગુજરાતી)' },
-                                  { code: 'mar_Deva', name: 'Marathi (मराठी)' },
-                                  { code: 'pan_Guru', name: 'Punjabi (ਪੰਜਾਬੀ)' },
-                                  { code: 'ory_Orya', name: 'Odia (ଓଡ଼ିଆ)' },
-                                ].map(lang => (
-                                  <button
-                                    key={lang.code}
-                                    onClick={() => handleTranslate(lang.code)}
-                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-orange-50 border border-gray-200 hover:border-[#E38B52] transition-all duration-150 text-sm font-medium text-gray-700 hover:text-[#E38B52]"
-                                  >
-                                    {lang.name}
-                                  </button>
-                                ))}
-                              </div>
-                              <button
-                                onClick={() => setShowLanguageSelector(false)}
-                                className="mt-3 w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-all"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-                          
                           <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap max-h-96 overflow-auto prose prose-sm max-w-none">
                             {translating ? (
                               <div className="flex items-center gap-2 text-gray-600">
                                 <div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>
-                                Translating to {selectedLanguage}...
+                                Translating to Malayalam...
                               </div>
                             ) : translatedSummary ? (
                               <div>
                                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-orange-200">
-                                  <span className="text-xs font-semibold text-[#E38B52] uppercase">Translated ({selectedLanguage})</span>
+                                  <span className="text-xs font-semibold text-[#E38B52] uppercase">Translated (Malayalam)</span>
                                   <button
-                                    onClick={() => { setTranslatedSummary(null); setSelectedLanguage(null); }}
+                                    onClick={() => { setTranslatedSummary(null); }}
                                     className="text-xs text-gray-500 hover:text-[#E38B52] underline"
                                   >
                                     Show Original
                                   </button>
                                 </div>
-                                {translatedSummary}
+                                <div className="whitespace-pre-wrap">{translatedSummary}</div>
                               </div>
                             ) : (
                               aiAnalysis?.summary || 'No progress summary available'
