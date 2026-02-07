@@ -141,220 +141,400 @@ const DynamicScrollButtons = () => {
 
 const SPECIAL_EDU_QUESTIONS = {
   grossmotor: [
-    'Walks independently on flat ground',
-    'Runs without losing balance',
-    'Jumps forward with both feet together',
-    'Climbs stairs with alternating feet',
-    'Stands on one foot for a few seconds',
-    'Kicks a ball towards a target',
-    'Throws a ball overhand',
-    'Catches a medium-sized ball',
-    'Balances while walking on a straight line',
-    'Jumps down safely from a low step',
+    'Holds head erect when in sitting or standing position (body may be supported by a person or prop).',
+    'Holds head up for 5 seconds when lying on stomach to look at an object/person.',
+    'Sits without support.',
+    'Rolls over on flat surface.',
+    'Moves from lying on stomach to a sitting position.',
+    'Crawls about a room containing furniture and/or other people.',
+    'Stands with support.',
+    'Pulls self to standing position using person or prop for support.',
+    'Stands unsupported.',
+    'Walks 5 feet (may use braces or crutches).',
+    'Walks upstairs and downstairs putting both feet on each step (may use wall or handrail for support).',
+    'Pushes or pulls furniture for rearrangement.',
+    'Runs.',
+    'Squats.',
+    'Walks upstairs and downstairs, alternating feet (may use wall or handrail for support).',
+    'Jumps to cross an obstacle (eg. dirty water, rubbish, any floor decoration).',
+    'Stands on tip toe to reach for an object at a height.',
+    'Walks continuously for a period of 15 minutes.',
+    'Carries own luggage to bus stand / station.',
+    'Rides a bicycle (without training wheels) / swims.',
   ],
   finemotor: [
-    'Uses pincer grasp to pick up small objects',
-    'Holds a pencil with three-finger grip',
-    'Draws straight vertical and horizontal lines',
-    'Copies a simple circle',
-    'Builds a tower with small blocks',
-    'Threads beads onto a string',
-    'Uses scissors to cut along a straight line',
-    'Opens and closes simple containers',
-    'Turns pages of a book one at a time',
-    'Buttons and unbuttons large buttons',
+    'Closes hand around an object placed in hand.',
+    'Reaches for and grasps objects.',
+    'Uses both hands at the same time, when handling an object.',
+    'Picks up small objects using thumb and fingers only.',
+    'Makes a stack of 3 cans, or tiffin carrier containers or wooden blocks.',
+    'Uses, a spoon to stir sugar / salt to mix a drink.',
+    'Strings three one-inch beads or spools on to a string.',
+    'Opens the door, operating door knob/latch/handle.',
+    'Screws and unscrews a jar or bottle lid.',
+    'Carries a filled paper cup without crushing, tipping or spilling.',
+    'Tears off a perforated sheet.',
+    'Places key correctly, locks and opens the lock.',
+    'Pours liquid from a pitcher into a tumbler without spilling.',
+    'Uses clips and safety pins.',
+    'Cuts out a picture involving straight lines using scissors, from magazine of a book.',
+    'Cuts out a picture involving circular lines, using scissors from a magazine.',
+    'Folds a letter, fits into an envelope, applies gum to seal and puts on a stamp.',
+    'Cuts/opens sachets / wrappers and empties into a container.',
+    'Strikes a safety match to light a candle/lamp',
+    'Threads a medium sized sewing needle within 2 tries.',
   ],
   eating: [
-    'Sits appropriately at the table for meals',
-    'Uses a spoon to eat semi-solid food',
-    'Drinks from an open cup without spilling',
-    'Chews food adequately before swallowing',
-    'Accepts a variety of common foods',
-    'Feeds self without constant physical help',
-    'Uses napkin/tissue to wipe mouth when prompted',
-    'Waits appropriately for food to be served',
-    'Washes hands before eating when reminded',
-    'Clears plate or cup after finishing',
+    'Swallows soft foods that do not require chewing.',
+    'Drinks without spilling, mouthful from glass or cup with assistance.',
+    'Bites required amounts of food item.',
+    'Differentiates between edible and non-edible substances.',
+    'Picks up dry pieces of food (biscuits) with fingers and puts food in mouth.',
+    'Chews solid food',
+    'Picks up a filled glass and drinks from it without spilling',
+    'Uses spoon/hand to pick up and cat mixed food.',
+    'Mixes food and eats with little or no spilling (may use fingers/ spoon).',
+    'Eats foods, (cereal preparations) such as idli, dosai, preri, roti (Use fingers to make bits).',
+    'Eats, supervised in public places without calling attention to eating behaviour.',
+    'Eats porridge, payasam (milk pudding), ice cream with little or no spilling.',
+    'Eats a complete meal with little or no spilling using all normal eating equipment dishes and utensils.',
+    'After eating, empties plate into a trash can and washes it.',
+    'Takes appropriate quantities, when food is offered.',
+    'While eating, politely asks for food to be passed, and waits for others to finish.',
+    'Makes necessary arrangements for and serves food in a family styles setting.',
+    'Identifies drinking water in a public place and drinks it.',
+    'Selects the required meal items when a variety of food is available.',
+    'Orders and eats in a public dining facility.',
   ],
   dressing: [
-    'Puts on shirt with minimal help',
-    'Buttons clothing independently',
-    'Zips or unzips jacket',
-    'Puts on trousers correctly',
-    'Chooses weather-appropriate clothes',
-    'Removes shoes independently',
-    'Wears footwear on correct feet',
-    'Manages simple fasteners (hooks/Velcro)',
-    'Keeps clothes tidy during the day',
-    'Changes clothes when wet/dirty',
+    'Offers little or no resistance while being dressed and undressed.',
+    'Extends and withdraws arms and legs as required while being dressed and undressed.',
+    'Removesunbuttoned shirt/blouse, underpants and outer pants.',
+    'Removes socks, banians, T Shurts/dresses, when unfastened.',
+    'Puts on underpants and outer pants.',
+    'Starts and closes a front zipper.',
+    'Puts on shirt/blouse.',
+    'Unbuttons (shirt button, press buttons, hooks).',
+    'Puts on a kurta/banian/TShirt/ dress (need not fasten).',
+    'Takes off ties, scarves, belts, hearing aid, spectacles or any Jewellery from self.',
+    'Puts socks and shoes (any foot wear) on correct feet.',
+    'Buttons clothing: (press buttons/shirt buttons/hooks).',
+    'Ties a bow knot with a shoe lace/ ribbon.',
+    'Puts on self-ties, scarves, belts, hearing aid, spectacles or any them of jewellery.',
+    'Selects clothing appropriate to seasonal / weather conditions and to different occasions.',
+    'Selects correct size, type and style of clothing at a store.',
+    'Laces shoes inserting the lace in each eyelet correctly.',
+    'Wears churidar with dupatia, half saree with skirt / lungi in the correct combinations. (different dress styles)',
+    'Dresses self, completely.',
+    'Wears dhoti / saree and manages it in the same manner the whole day (traditional dresses)',
   ],
   grooming: [
-    'Combs hair when prompted',
-    'Washes face independently',
-    'Keeps nails reasonably clean',
-    'Uses handkerchief/tissue appropriately',
-    'Keeps general appearance neat',
-    'Looks in mirror to adjust appearance',
-    'Uses deodorant when guided',
-    'Wipes mouth after eating',
-    'Manages simple grooming items safely',
-    'Shows awareness of personal hygiene',
+    'Offers little or no resistance while being washed.',
+    'Turns head and extends hands as required while being bathed.',
+    'Dries hands with a towel.',
+    'Begins brushing motion for cleaning teeth (uses brush or finger).',
+    'Rinses hands when told.',
+    'Soaps and rinses hands.',
+    'Covers mouth while sneezing, coughing and yawning.',
+    'Soaps and rinses face.',
+    'Uses tooth-paste or tooth powder, brushes teeth and rinses mouth.',
+    'Runs a comb or brush through hair with several strokes.',
+    'Blows nose, wipes drooling using a handkerchief.',
+    'Bathes independently.',
+    'Dries entire body with a towel after bathing.',
+    'Applies face powder/deodorent/bindi (decoration on forehead)',
+    'Washes, rinses and dries hair.',
+    'Combs hair including oiling and plaiting (if necessary).',
+    'Cleans and clips finger nails with a nail clipper.',
+    'Cleans ear, using cotton buds.',
+    'Shaves (male) / maintains menstrual hygiene (female)..',
+    'Maintains self, clean, odour-free and groomed.',
   ],
   toileting: [
-    'Indicates need to use toilet',
-    'Goes to toilet with minimal guidance',
-    'Manages clothing before toileting',
-    'Uses toilet seat appropriately',
-    'Cleans self after toilet use',
-    'Flushes toilet after use',
-    'Washes hands after toileting',
-    'Keeps toilet area reasonably clean',
-    'Remains dry between scheduled times',
-    'Uses toilet independently most days',
+    'Stays dry for two hours',
+    'Sits on the toilet for thirty seconds ',
+    'Eliminates when on the toilet (bowel or bladder)',
+    'Removes clothing before sitting on the toilet.',
+    'Goes to the toilet when reminded',
+    'Indicates by gestures or words when needed, to use the toilet.',
+    'Has bowel control giving time enough to reach the toilet (after indicating)',
+    'Has bladder control giving time enough to reach the toilet (after indicating)',
+    'Replaces clothing before leaving the toilet.',
+    'Removes clothing, sits on the toilet, eliminates and replaces clothing after washing (needs help for washing)',
+    'Goes to the toilet independently',
+    'Uses only a urinal or toilet for urination',
+    'Flushes the toilet after use.',
+    'Has bladder control at night.',
+    'Closes door of toilet for normal privacy in toileting.',
+    'Cleans self-using water after elimination.',
+    'Obtains help for any toileting problem.',
+    'Asks the location of the toilet in new situations.',
+    'Washes and dries hands after toileting.',
+    'Chooses the correct toilet (Men/Women) in a public place.',
   ],
   receptivelanguage: [
-    'Responds when name is called',
-    'Understands simple one-step commands',
-    'Understands two-step directions',
-    'Identifies common objects when named',
-    'Understands basic classroom instructions',
-    'Follows group directions in class',
-    'Understands simple “who/what/where”',
-    'Understands yes/no questions',
-    'Understands basic time words (now/later)',
-    'Understands simple positional words',
+    'Turns head towards the source of sound.',
+    'Responds by eye contact or verbal "acknowledgement when name is called.',
+    'Responds to the instruction "Look at me".',
+    'Obeys simple instructions such as, "Come here" and so on. ',
+    'Stops an activity upon request such as "No" or "Stop".',
+    'Performs the activity when the word "Me" is used such as "Give me the ball". ',
+    'Identifies different sounds such as bell ringing, hands clapping, whispering, keys jingling.',
+    'Responds to non verbal communication from others such as frowning, crying, smiling, etc., by returning the gesture or by giving an appropriate verbal response.',
+    'Points to any common object, such as ball, spoon etc., upon request.',
+    'Points to 10 body parts such as nose, eyes, mouth etc.',
+    'Points to pictures of objects in a book upon request.',
+    'Follows prepositions such as "Put the ball into the box" or "Put the broom behind the door".',
+    'Avoids dangers when instructed to do so.',
+    'Follows two-step directions in order such as, "Get the ball and close the door".',
+    'Follows left and right when instructed.',
+    'Follows three-step, directions such as "Stand-up", "Open the book and Move the chair".',
+    'Identifies common harmful substances even if not labeled.',
+    'After listening to a one-page story, indicates "Yes" or "No" to specific questions on it.',
+    'Follows announcements on TV, Radio, at railway station, bus stand or airport with appropriate responses.',
+    'Responds to jokes (humorous happenings at home and school), with expressions.',
   ],
   expressivelanguage: [
-    'Uses single words to communicate needs',
-    'Uses simple phrases (2–3 words)',
-    'Answers simple questions verbally',
-    'Initiates simple conversation',
-    'Uses gestures along with speech',
-    'Names common objects correctly',
-    'Describes simple actions',
-    'Expresses basic feelings in words',
-    'Speaks clearly enough to be understood',
-    'Asks for help when needed',
+    'Makes voice sounds.',
+    'Uses voice sounds to get attention.',
+    'Says or indicates, "Yes" or "No" in response to questions.',
+    'Imitates five words heard either singularly or all at once.',
+    'Says 20 words.',
+    'Says name when asked.',
+    'Names common objects when asked, "What is this?"',
+    'Names 10 body parts when asked, "What is this?"',
+    'Uses two-word phrases/gestures such as, "Hello, friend", "Go out" o "Eat biscuit".',
+    'Tells/indicates name and occupation of parents.',
+    'Communicates address of residence and contact phone number.',
+    'Expresses feelings, desires or problems in complete sentences such a "I am hungry", verbally/gesturally.',
+    'Asks simple questions such as "What is this?" or "Why can`t I?" verbally/ gesturally,',
+    'Uses pronouns such as "I", "You", "He", "Her", "Me" or "Mine" in complete sentence.',
+    'Speaks in phrases or sentences/gestures to communicate to someone not familiar with the person.',
+    'Names/indicates country, the President, Prime Minister, Chief Minister of the country.',
+    'Carries on a meaningful conversation with another person(s) for 10 minutes.',
+    'Describes past events in a logical order.',
+    'Summarizes a T.V./Radio programme in own words',
+    'Discusses current events.',
   ],
   socialinteraction: [
-    'Greets familiar people appropriately',
-    'Maintains eye contact briefly',
-    'Shares materials with peers',
-    'Takes turns during play/activities',
-    'Waits appropriately in a queue',
-    'Joins group activities when invited',
-    'Respects personal space of others',
-    'Shows concern when others are upset',
-    'Follows basic classroom rules',
-    'Participates in group games',
+    'Responds when touched, by reaching towards or moving away.',
+    'Looks towards or otherwise, indicates a person in the immediate area.',
+    'Follows with eyes, a person moving.',
+    'Plays alone with toys or objects for 2 minutes.',
+    'Imitates arm movements such as dapping hands or waving goodbye.',
+    'Identifies by pointing, naming, friends and acquaintances from strangers.',
+    'Greets others upon meeting, either verbally or with non-verbal friendly gestures.',
+    'Waits for own turn in a group.',
+    'Says "Please" and "Thank you" and "Sorry".',
+    'Receives guests appropriate to acquaintance (differences in the receiving. of relatives, strangers, gas/electricity men and so on).',
+    'Uses items that belong to others, only with their permission.',
+    'Objects/asks for help if someone uses own belongings without permission.',
+    'Interacts with members of the opposite sex and members of different age groups (as required by his community).',
+    'Responds using proper social courtsies on occasions such as festivals, apologizes, offers greeting or compliments as needed.',
+    'Participates actively in social events by engaging in the same activity as the other members of the group.',
+    'Manages/asks for help if/when teased or bullied.',
+    'Receives phone calls/passes on information to the right person when given messages personally or by phone.',
+    'Shares possessions with others (in classroom, home and community).',
+    'Participates in group activities taking the role of a leader.',
+    'Visits neighbours, relatives and friends when required',
   ],
   reading: [
-    'Recognizes own name in print',
-    'Identifies letters of the alphabet',
-    'Matches letters to sounds (phonics)',
-    'Reads simple CVC words (cat, dog)',
-    'Reads simple sight words',
-    'Understands what is read with help',
-    'Reads short sentences aloud',
-    'Tracks text left to right',
-    'Recognizes common classroom labels',
-    'Shows interest in story books',
+    'Looks at objects presented when seated at a table.',
+    'Tums the pages of a book, one at a time.',
+    'Matches 10 pictures with objects.',
+    'Sorts objects of 3 different shapes.',
+    'Identifies names, colours (red, yellow, blue and green) when objects with those colours are presented',
+    'Sort pictures of similar and/or familiar objects into the same category Eg. Animals, people, vehicles, fruits, flowers etc.',
+    'Reads out functional 3 letter words.',
+    'Shown 5 pictures sequentially arranged and told a story with them, pictures then jumbled up, arranges them again in sequence.',
+    'When needed reads the following words and acts accordingly: Stop, Men, Women, Danger, Poison, Exit, Pull, Push, In, Out, Enter.',
+    'Reads out functional two word phrases.',
+    'Using price tags/price markings, identifies cost of purchases.',
+    'Reads aloud, sentences with five common words.',
+    'Reads a simple sentence and answers questions about it.',
+    'Reads a paragraph (5 lines) and answers questions.',
+    'Uses a menu card to order meals at restaurants.',
+    'Reads a story to others.',
+    'Reads for information or entertainment from newspapers, magazines and story books.',
+    'Reads a simple story silently and states its main idea.',
+    'Reads out a recipe for cooking.',
+    'Reads and follows directions with objects to be assembled.',
   ],
   writing: [
-    'Holds pencil with functional grip',
-    'Traces straight lines accurately',
-    'Copies simple shapes and patterns',
-    'Writes own name legibly',
-    'Writes a few known words',
-    'Copies from board with support',
-    'Leaves appropriate spacing between words',
-    'Writes within given margins/lines',
-    'Uses capital and small letters',
-    'Completes short writing tasks',
+    'Grasps chalk, pencil or crayon.',
+    'Scribbles with chalk, pencil, or crayon.',
+    'Grasps chalk, pencil or crayon for writing with thumb, index finger and middle finger.',
+    'Traces with pencil or crayon along a three-inch straight line.',
+    'Colours with lines.',
+    'Copies with a pencil, a vertical, a horizontal or a diagonal line.',
+    'Traces three circles and semi circles.',
+    'Traces geometric shapes (square, rectangle, and triangle).',
+    'Traces three letter functional words.',
+    'Copies his name.',
+    'Writes his name readably with initials or father`s name with no example to look at.',
+    'Copies a printed sentence readably.',
+    'Writes address and phone number readably.',
+    'Copies a paragraph readably with punctuations on / to a sheet of lined paper wring on the lines',
+    'Writes functional dictated words readably',
+    'Writes a short sentence readably when dictated.',
+    'Writes answers readably to questions after reading a paragraph.',
+    'Writes a paragraph of 5 lines readably on a given topic.',
+    'Writes personal letters for mailing using legible handwriting in an informal letter style.',
+    'Fills / writes an application form readably.',
   ],
   numbers: [
-    'Counts objects up to 5',
-    'Counts objects up to 10',
-    'Recognizes numerals up to 10',
-    'Matches number to quantity (1–10)',
-    'Performs simple addition with objects',
-    'Performs simple subtraction with objects',
-    'Sequences numbers in correct order',
-    'Understands “more” and “less”',
-    'Reads simple number sentences',
-    'Applies number skills in routine tasks',
+    'Creates order out of a group of objects by lining up, stacking or placing them in some other pattern. ',
+    'Indicates the difference between "more" and "less" when shown two different sized groups of objects.',
+    'Separates one object from a group upon request, eg. "Give me one block".',
+    'Points to "big/small" when asked.',
+    'Points to "short", "long" and "tall" when asked.',
+    'Chooses the correct number of objects up to 5 upon request eg. "Give me three blocks" etc.',
+    'Chooses correct number of objects up to 10.',
+    'Names the printed number symbols, 1 through 10 when asked at random.',
+    'Performs activities according to the ordinal number (1st,2nd,3rd)eg. Forming a queue according to the number given.',
+    'Writes the number symbols 1 through 10.',
+    'Counts from 10 to 20.',
+    'Matches the printed number symbols 1 through 100 with the correct number of objects.',
+    'Does 3 line single digit addition on paper?',
+    'Adds single digit numbers with sums up to 10 such as 7+3, 2+1 or 8+ 2in functional situation eg.ina purchase.',
+    'Subtracts single digit addition on paper.',
+    'Does two line two digit addition on paper with carry over.',
+    'Does subtraction sums - two digits with borrowing on paper.',
+    'Does simple two operations in a shopping situation eg, buy 2 things costing Rs. 3 and Rs.5 and balance for Rs.10.',
+    'Says multiplication tables 5 and 10.',
+    'Uses a simple calculator with basic four operations.',
   ],
   time: [
-    'Understands parts of the day',
-    'Knows days of the week',
-    'Recognizes morning vs afternoon',
-    'Understands “before” and “after”',
-    'Reads time to the hour on a clock',
-    'Reads simple schedules/timetables',
-    'Arrives on time to class with help',
-    'Understands duration (short/long)',
-    'Follows a basic daily routine',
-    'Uses time words appropriately',
+    'Associates the time of the day with activities such as meals time or bed time.',
+    'Responds to "Now", "Later", "Hurry" and "Wait" appropriately.',
+    'Answers appropriatelywhenasked, "Is it morning or afternoon, evening / night".',
+    'Indicates  statingowe age.',
+    'Indicates the difference between yesterday, today and tomorrow, using the terms in the correct context. ',
+    'Identifies or names the 7 days of the week in a calendar.',
+    'Answers/points out correctly when asked "What day of the week and date is it today".',
+    'Identifies or names hour hand, minute hand and numbers on a clock.',
+    'Identifies or names the 12 months of the year in a calendar.',
+    'Answers/ indicates when asked "What month and year is it now.',
+    'Identifies or names the seasons of the year',
+    'Identifies or tells birth - date, month, day and year.',
+    'Tells time by the hour on a clock.',
+    'Reads time on a digital clock.',
+    'Tells time by 30 minutes.',
+    'Tells time to five minutes on a clock or watch',
+    'Meets a particular scheduled bus.',
+    'Road TV, Radios and Train schedules.',
+    'Arrives on time (date and time) for any appointment (egmarriage, parties, cinema, doctors).',
+    'Sets a clock to within one hour of the correct time after hearing the correct time.',
   ],
   money: [
-    'Recognizes common coins/notes',
-    'Understands basic value differences',
-    'Matches coins to price tags',
-    'Counts small amounts of money',
-    'Hands over money to buy small items',
-    'Waits for and takes change',
-    'Keeps money safely in pocket/bag',
-    'Understands that items cost money',
-    'Uses money in simple role-play',
-    'Shows emerging responsibility with money',
+    'Sorts coins from other small metal objects.',
+    'Selects a rupee note from other paper objects.',
+    'Selects 5p. 10p, 20p, 25p and 50p, 1 Rs and 2 Rs. coins from a group of coins. ',
+    'Uses money to buy things (might not use correct amount).',
+    'Identifies 1, 4, 5, 10, 20, 50 and 100 rupee notes.',
+    'Rank orders coins and rupee notes in order of value.',
+    'Exchanges 10p coins for Rs.1.',
+    'Exchanges 25p coins and 50p coins for Rs.1.',
+    'Exchanges 5p.coins for Rs.1.',
+    'Exchanges the correct number of mixed coins for Rs.1.',
+    'Exchanges the correct number of mixed coins and rupee notes for Rs.5.',
+    'Uses correct amount of money for machines (weighing machine, telephone)',
+    'Exchanges the correct number of mixed coins and rupee notes for Rs.50.',
+    'Saves money for a purchase.',
+    'Counts the change from a purchase of Rs.5 or less checking the Quantity bought.',
+    'Gives an adequate amount of money for purchases up to Rs.20 checking the quantity bought and counts the change.',
+    'Counts the change from a purchase up to Rs.50 checking the quantity bought.',
+    'Counts change from a purchase up to Rs.100 checking the quantity bought.',
+    'Selects an item comparing the prices (concept of expensive, cheap).',
+    'Saves money in a bank account.',
   ],
   domesticbehaviour: [
-    'Helps in simple cleaning tasks',
-    'Keeps personal area neat',
-    'Puts toys/materials back after use',
-    'Helps set the table for meals',
-    'Helps clear dishes after meals',
-    'Follows simple home routines',
-    'Handles household items safely',
-    'Participates in simple chores',
-    'Follows safety rules at home',
-    'Shows responsibility with belongings',
+    'Picks up household trash or litter and places it in a waste basket upon request.',
+    'Puts away personal items in the proper location upon request.',
+    'Dusts furniture leaving no dust on flat surfaces.',
+    'Damp wipes a floor.',
+    'Folds clothes and puts them in a drawer/cupboard.',
+    'Makes bed, stretching, spreading, rolling, folding.',
+    'Sorts vegetable/grocery items bought from market and stores them in respective containers.',
+    'Sweeps a floor with a broom, picks up sweepings in a dust pan and empties the pan.',
+    'Washes and dries dishes.',
+    'Prepares pre-made drinks (like Rasna) when asked.',
+    'Peels and cuts vegetables and fruits.',
+    'Operates a grinder, mixie or grinding stone.',
+    'Puts off the fire or removes cooker, cooking utensil from the fire in time.',
+    'Assists in simple first aid.',
+    'When required, uses a weighing machine, measuring tape or measuring cup.',
+    'Prepares coffee or tea.',
+    'Washes and dries clothes.',
+    'Irons clothes.',
+    'Does simple home repairs (such as sewing on buttons or re-joining broken seams, using needle and thread or machine, uses nail hammer, screw driver).',
+    'Prepares a meal under supervision.',
   ],
   communityorientation: [
-    'Recognizes familiar places (school, home)',
-    'Identifies important people (teacher, doctor)',
-    'Follows rules in public places',
-    'Waits safely at roadside',
-    'Uses zebra crossing/footpath with help',
-    'Recognizes common symbols/signs',
-    'Stays with group on outings',
-    'Asks for help from safe adults',
-    'Behaves appropriately in public',
-    'Shows awareness of own address/school',
+    'Performs simple errands within a familiar setting.',
+    'Finds way by self from one place to another within a familiar building)',
+    'Finds way from one building to another in the immediate neighbourhood.',
+    'Goes to public places in a supervised group without calling unfavourable attention to self.',
+    'Identifies a police man, postman, and a fireman, conductor of a bus a delivery man and telephone serviceman and persons from power supply.',
+    'Interacts with strangers in public (as the situation warrants).',
+    'Crosses residential street intersections, looking in both directions and waiting for traffic to clear before crossing.',
+    'Walks along road that has no sidewalk - maintains left side.',
+    'Responds appropriately to social kidding, teasing in public.',
+    'Moves about freely in his neighbourhoodeg., school, post office, milk booth, market, place of worship.',
+    'When goes out with a group, maintains the group norms.',
+    'Obeys signal lights and "Walk" "Don`t walk" signals at light controlled intersections.',
+    'Goes on foot or bicycle to a familiar place over half a kilometer from residence and returns.',
+    'Travels independently by public bus/suburban train in a familiar route.',
+    'Participates in religious activities following rules (Poga/Prayer).',
+    'Leaves an awkward public situation that is beyond control and seeks help.',
+    'Telephones for information or assistance when necessary.',
+    'Follows directions in terms of east, west, north, south and reaches thedestination.',
+    'Uses community facilities eg., hospital, railway, bus police station and post office.',
+    'Casts vote.',
   ],
   recreation: [
-    'Participates in simple games',
-    'Chooses preferred leisure activities',
-    'Follows rules of simple games',
-    'Takes turns in play activities',
-    'Shares play materials with peers',
-    'Tries new recreational activities',
-    'Shows enjoyment during play',
-    'Stops play when time is over',
-    'Balances work and play time',
-    'Engages in age-appropriate hobbies',
+    'Engages in a leisure-time activity for 5 minutes when materials are given.',
+    'Plays simple ball games like candling, throwing, bouncing and rolling a ball.',
+    'Watches TV without disturbing others.',
+    'Engages in activities such as finger painting/trash painting',
+    'Plays indoor games not governed by rules with others.',
+    'Participates in group singing or dancing (activity or passively).',
+    'Plays simple outdoor games not governed by rules eg. Sand play.',
+    'Plays outdoor games involving simple rules with others.',
+    'Plays indoor games, governed by simple rules.',
+    'Watches TV or listens to the radio, tape recorder by selecting a station/channel turning on and off, including use of cassettes.',
+    'Involves in activities such as playing with pets, or hobbies such as collection of pictures and so on.',
+    'Participates in outdoor activities, swimming/ cycling / walking/ playing.',
+    'Performs art and craft activities such as clay work, leather work or bead work/rangoli/kolam and so on.',
+    'Initiates self-involvement in a hobby, not including reading or watching TV.',
+    'Does gardening/makes flower garlands/mango leaf chain for the door.',
+    'Participates in organized team sports such as cricket, basketball or volley ball.',
+    'Uses community recreation facilities for recreation and leisure time activities - theatres, parks and other amusement places',
+    'Participates in planning, preparing for parties and so on.',
+    'Selects books from library for personal reading.',
+    'Plays a musical instrument/sings (solo)',
   ],
   vocational: [
-    'Shows interest in work-like tasks',
-    'Follows simple work instructions',
-    'Completes assigned task with support',
-    'Uses basic tools safely',
-    'Sorts objects by type/size/color',
-    'Packs/unpacks simple materials',
-    'Maintains task focus for few minutes',
-    'Works as part of a small group',
-    'Accepts feedback on work',
-    'Shows readiness for further training',
+    'Assumes a body position at a task or at play such that both hands are available for use.',
+    'Participates in a single activity for 10 minutes (if protected from interference).',
+    'Performs a single activity under supervision, in a room with people.',
+    'Assembles two-part objects that fit together in a simple but secure way.',
+    'Performs an assigned task or activity for half an hour (may need motivation with rewards).',
+    'Puts away own tools and materials at the end of a task (may need a reminder up to one-half of the time).',
+    'Stops a task when required.',
+    'Participates in group work cooperating with the other members of the group.',
+    'Changes activity without showing discomfort when assigned-from one task to a different task.',
+    'Accepts supervision and criticism.',
+    'Goes to an assigned area without reminder in a daily routine programme.',
+    'Undertakes and completes a task in order to receive money.',
+    'Reads and then follows the notices, memorandums/circulars. If not able to read, asks for assistance and then follows.',
+    'Reports for work on time.',
+    'Increases speed of work when told to do so.',
+    'Follows the sequence of activities in the routine work skill.',
+    'Indicates if own performances meet the standards set for an activity.',
+    'Works full time (8 hours).',
+    'When situation demands, works in a team.',
+    'Responds to accidents like fire, electricity, injury by informing the concerned people immediately.',
   ],
 };
 
@@ -377,6 +557,14 @@ const SPECIAL_EDU_SKILLS = [
   { key: 'communityorientation',label: 'Community Orientation' },
   { key: 'recreation',          label: 'Recreation' },
   { key: 'vocational',          label: 'Vocational' },
+];
+
+const SPECIAL_EDU_ASSESSMENT_PHASES = [
+  '1st assmt',
+  '1st Qtr',
+  '2nd Qtr',
+  '3rd Qtr',
+  '4th Qtr',
 ];
 
 const normalizeSectionKey = (label) =>
@@ -474,6 +662,7 @@ const StudentPage = () => {
   };
   
   const [activeSkillByTable, setActiveSkillByTable] = useState({});
+  const [questionsOpenByTable, setQuestionsOpenByTable] = useState({});
 
   const handleAISummarize = async () => {
     setAiSummaryError(null);
@@ -1381,7 +1570,14 @@ useEffect(() => {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      setSavedTables(parsed);
+      const normalized = parsed.map(t => ({
+        ...t,
+        // default: tables from previous sessions are read-only
+        isEditable: t.isEditable === true,
+        assessment_phase: t.assessment_phase || '1st assmt',
+        last_edited_at: t.last_edited_at || null,
+      }));
+      setSavedTables(normalized);
     }
   } catch (err) {
     console.warn('Failed to load saved Special Education tables', err);
@@ -1450,6 +1646,9 @@ useEffect(() => {
           ...t,
           report_date: reportDate || null,
           extracted_at: t.extracted_at || extractedAt,
+          isEditable: true, // newly extracted tables are editable + show Save
+          assessment_phase: '1st assmt',  // default: converted image = 1st assessment
+          last_edited_at: extractedAt,     // first “edit” time = extraction
         }));
       
         // Use enriched tables for current session
@@ -1505,6 +1704,33 @@ useEffect(() => {
     setExtractionData(null);
     setExtractionSummary(null);
     if (fileInputRef.current) fileInputRef.current.value = null;
+  };
+
+  const handleSetTableEditable = (targetTable, editable) => {
+    setSavedTables(prev => {
+      const nowIso = !editable ? new Date().toISOString() : null;
+  
+      const updated = prev.map(t => {
+        if (t !== targetTable) return t;
+        return {
+          ...t,
+          isEditable: editable,
+          // only stamp when saving (editable=false)
+          last_edited_at: !editable ? nowIso : t.last_edited_at || nowIso,
+        };
+      });
+  
+      try {
+        if (typeof window !== 'undefined' && id) {
+          const key = `special-education-tables:${id}`;
+          window.localStorage.setItem(key, JSON.stringify(updated));
+        }
+      } catch (err) {
+        console.warn('Failed to persist table edit state', err);
+      }
+  
+      return updated;
+    });
   };
 
   const handleDeleteTable = (viewIndex) => {
@@ -3889,10 +4115,72 @@ const handleGenerateSummaryReport = () => {
                           </p>
                           <p className="text-xs text-white/80 mt-1">
                             Extracted on{' '}
+                            <p className="text-xs text-white/80 mt-1">
+                              Assessment: {table.assessment_phase || '1st assmt'}
+                            </p>
+                            <p className="text-xs text-white/80 mt-1">
+                              Last edited:{' '}
+                              {table.last_edited_at
+                                ? new Date(table.last_edited_at).toLocaleString()
+                                : 'Not edited yet'}
+                            </p>
                             {table.extracted_at
                               ? new Date(table.extracted_at).toLocaleString()
                               : 'Unknown'}
                           </p>
+                        </div>
+                        <div className="flex items-center gap-3 ml-auto">
+                          <select
+                            value={table.assessment_phase || '1st assmt'}
+                            onClick={e => e.stopPropagation()}
+                            onChange={e => {
+                              e.stopPropagation();
+                              const phase = e.target.value;
+                              const nowIso = new Date().toISOString();
+                          
+                              setSavedTables(prev => {
+                                const updated = prev.map(t =>
+                                  t === table
+                                    ? { ...t, assessment_phase: phase, last_edited_at: nowIso }
+                                    : t
+                                );
+                                try {
+                                  if (typeof window !== 'undefined' && id) {
+                                    const key = `special-education-tables:${id}`;
+                                    window.localStorage.setItem(key, JSON.stringify(updated));
+                                  }
+                                } catch (err) {
+                                  console.warn('Failed to persist assessment phase', err);
+                                }
+                                return updated;
+                              });
+                            }}
+                            className="text-[11px] bg-white/90 text-[#170F49] border border-white/70 rounded-full px-2 py-1 focus:outline-none focus:ring-1 focus:ring-white shadow-sm"
+                          >
+                            {SPECIAL_EDU_ASSESSMENT_PHASES.map(phase => (
+                              <option key={phase} value={phase}>{phase}</option>
+                            ))}
+                          </select>                 
+                          {/* Edit/Save toggle */}
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation(); // don't toggle the <details> open/close
+                              handleSetTableEditable(table, !table.isEditable);
+                            }}
+                            className={
+                              'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ' +
+                              (table.isEditable
+                                ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
+                                : 'bg-white text-[#E38B52] border-[#E38B52]/40 hover:bg-orange-50')
+                            }
+                          >
+                            {table.isEditable ? 'Save' : 'Edit'}
+                          </button>
+                        
+                          {/* existing Export button ... */}
+                          {/* existing Delete button ... */}
                         </div>
                        <div className="flex items-center gap-3 ml-auto">
                           {/* Export icon */}
@@ -3995,41 +4283,86 @@ const handleGenerateSummaryReport = () => {
                         if (!sessionHeaders.length) return null;
                       
                         // Only show skills that actually exist in this table
-                        const availableSkills = SPECIAL_EDU_SKILLS.filter(s =>
-                          table.rows.some(row =>
-                            normalizeSectionKey(row[skillColumn]) === s.key
-                          )
-                        );
-                        if (!availableSkills.length) return null;
-                      
                         const tableKey = tableIndex;
-                        const defaultKey = availableSkills[0].key;
-                        const activeKey = activeSkillByTable[tableKey] || defaultKey;
-                        const currentSkill =
-                          availableSkills.find(s => s.key === activeKey) || availableSkills[0];
+                        const activeKey = activeSkillByTable[tableKey] || null;
+                        const isQuestionsOpen = !!questionsOpenByTable[tableKey];
                       
-                        const questions = SPECIAL_EDU_QUESTIONS[currentSkill.key] || [];
+                        const currentSkillMeta = activeKey
+                          ? SPECIAL_EDU_SKILLS.find(s => s.key === activeKey)
+                          : null;
                       
-                        // Find the row index for the currently selected skill
-                        const skillRowIndex = table.rows.findIndex(row =>
-                          normalizeSectionKey(row[skillColumn]) === currentSkill.key
-                        );
+                        const questions = activeKey
+                          ? (SPECIAL_EDU_QUESTIONS[activeKey] || [])
+                          : [];
+                      
+                        const skillRowIndex = activeKey
+                          ? table.rows.findIndex(
+                              row => normalizeSectionKey(row[skillColumn]) === activeKey
+                            )
+                          : -1;
+                      
                         const skillRow = skillRowIndex >= 0 ? table.rows[skillRowIndex] : null;
-                      
-                        // When user clicks Yes/No, update that cell (A/B) in state + localStorage
+                        const canEdit = !!table.isEditable;
+
                         const handleToggleCell = (colName, newValue) => {
-                          if (!skillRow) return;
+                          if (!skillRow || !activeKey || !canEdit) return;
+                        
+                          const phase = table.assessment_phase || '1st assmt';
+                          const isQuarterPhase =
+                            phase === '1st Qtr' ||
+                            phase === '2nd Qtr' ||
+                            phase === '3rd Qtr' ||
+                            phase === '4th Qtr';
+                        
                           setSavedTables(prev => {
+                            const nowIso = new Date().toISOString();
+                        
                             const updated = prev.map(t => {
                               if (t !== table) return t;
                               const rows = t.rows || [];
-                              const newRows = rows.map((row, idx) => {
-                                if (idx !== skillRowIndex) return row;
-                                return { ...row, [colName]: newValue };
-                              });
-                              return { ...t, rows: newRows };
+                        
+                              // For non-quarter phases (e.g. 1st assmt), edit the base value directly.
+                              if (!isQuarterPhase) {
+                                const newRows = rows.map((row, idx) =>
+                                  idx === skillRowIndex ? { ...row, [colName]: newValue } : row
+                                );
+                                return { ...t, rows: newRows, last_edited_at: nowIso };
+                              }
+                        
+                              // For quarter phases (1st–4th Qtr): only B can be "promoted" to count as A
+                              // in that specific quarter, without changing the underlying B in the table.
+                              const row = rows[skillRowIndex] || {};
+                              const rawCurrent = row[colName];
+                              const currentVal =
+                                typeof rawCurrent === 'string'
+                                  ? rawCurrent.trim().toUpperCase()
+                                  : '';
+                        
+                              if (currentVal !== 'B') return t; // ignore non‑B cells in quarter phases
+                        
+                              const cellKey = `${skillRowIndex}:${colName}`;
+                              const existing = t.quarterOverrides || {};
+                              const phaseOverrides = existing[phase] || {};
+                        
+                              let newPhaseOverrides = phaseOverrides;
+                              if (newValue === 'A') {
+                                // mark this B as "counts as A" for this quarter
+                                newPhaseOverrides = { ...phaseOverrides, [cellKey]: 'A' };
+                              } else if (newValue === 'B') {
+                                // remove the override, back to plain B for this quarter
+                                const { [cellKey]: _removed, ...rest } = phaseOverrides;
+                                newPhaseOverrides = rest;
+                              } else {
+                                return t;
+                              }
+                        
+                              return {
+                                ...t,
+                                quarterOverrides: { ...existing, [phase]: newPhaseOverrides },
+                                last_edited_at: nowIso,
+                              };
                             });
-                      
+                        
                             try {
                               if (typeof window !== 'undefined' && id) {
                                 window.localStorage.setItem(
@@ -4040,7 +4373,7 @@ const handleGenerateSummaryReport = () => {
                             } catch (err) {
                               console.warn('Failed to persist updated Special Education tables', err);
                             }
-                      
+                        
                             return updated;
                           });
                         };
@@ -4051,56 +4384,63 @@ const handleGenerateSummaryReport = () => {
                               <h4 className="text-xs font-semibold text-gray-700">
                                 Questionnaire (A = Yes, B = No)
                               </h4>
+                              {activeKey && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setQuestionsOpenByTable(prev => ({
+                                      ...prev,
+                                      [tableKey]: !prev[tableKey],
+                                    }))
+                                  }
+                                  className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-100"
+                                >
+                                  {questionsOpenByTable[tableKey] ? 'Hide questions' : 'Show questions'}
+                                </button>
+                              )}
                             </div>
-                      
-                            {/* Clickable skills: Gross Motor, Fine Motor, ... */}
-                            <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-                              {availableSkills.map(skill => {
-                                const isActive = skill.key === activeKey;
-                                return (
-                                  <button
-                                    key={skill.key}
-                                    type="button"
-                                    onClick={e => {
-                                      e.preventDefault(); // don’t toggle <details>
-                                      setActiveSkillByTable(prev => ({
-                                        ...prev,
-                                        [tableKey]: skill.key,
-                                      }));
-                                    }}
-                                    className={
-                                      'px-3 py-1 rounded-full text-[11px] font-medium border transition-all ' +
-                                      (isActive
-                                        ? 'bg-[#E38B52] text-white border-[#E38B52] shadow-sm'
-                                        : 'bg-white text-[#170F49] border-gray-200 hover:bg-orange-50')
-                                    }
-                                  >
-                                    {skill.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                      
+                            {!canEdit && (
+                              <p className="text-[11px] text-gray-500 mb-1">
+                                This table is read-only. Click "Edit" in the header to modify.
+                              </p>
+                            )}
+                                                  
                             {/* Questions for the currently selected skill only */}
                             <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                              {!skillRow ? (
+                              {!activeKey ? (
                                 <div className="text-[11px] text-gray-500">
-                                  No data for {currentSkill.label} in this table.
+                                  Click a skill in the Skill Area column to view its questions.
+                                </div>
+                              ) : !skillRow ? (
+                                <div className="text-[11px] text-gray-500">
+                                  No data for this skill in this table.
+                                </div>
+                              ) : !isQuestionsOpen ? (
+                                <div className="text-[11px] text-gray-500">
+                                  Questions are hidden. Click "Show questions" to view them.
                                 </div>
                               ) : (
                                 <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
                                   {questions
                                     .slice(0, sessionHeaders.length)
                                     .map((questionText, idx) => {
-                                      const colName = sessionHeaders[idx]; // "1", "2", ...
+                                      const colName = sessionHeaders[idx];
+                                      const phase = table.assessment_phase || '1st assmt';
+                                      const overridesForPhase =
+                                        (table.quarterOverrides && table.quarterOverrides[phase]) || {};
+                                      const cellKey = `${skillRowIndex}:${colName}`;
+                                      
                                       const rawValue = skillRow[colName];
-                                      const value =
+                                      const baseVal =
                                         typeof rawValue === 'string'
                                           ? rawValue.trim().toUpperCase()
                                           : '';
-                                      const isYes = value === 'A';
-                                      const isNo = value === 'B';
-                      
+                                      const effectiveVal =
+                                        overridesForPhase[cellKey] === 'A' ? 'A' : baseVal;
+                                      
+                                      const isYes = effectiveVal === 'A';
+                                      const isNo = effectiveVal === 'B';
+                            
                                       return (
                                         <div
                                           key={idx}
@@ -4110,12 +4450,13 @@ const handleGenerateSummaryReport = () => {
                                             <span className="font-semibold mr-1">{idx + 1}.</span>
                                             {questionText}
                                           </span>
-                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                          <div className="flex items-center gap-1 flex-shrink-0">                                            
                                             <span
-                                              role="button"
-                                              onClick={() => handleToggleCell(colName, 'A')}
+                                              role={canEdit ? 'button' : undefined}
+                                              onClick={canEdit ? () => handleToggleCell(colName, 'A') : undefined}
                                               className={
-                                                'px-2 py-[1px] rounded-full border text-[10px] cursor-pointer ' +
+                                                'px-2 py-[1px] rounded-full border text-[10px] ' +
+                                                (canEdit ? 'cursor-pointer ' : 'cursor-not-allowed opacity-60 ') +
                                                 (isYes
                                                   ? 'bg-green-100 text-green-700 border-green-300'
                                                   : 'text-gray-500 border-gray-200 hover:bg-green-50')
@@ -4123,11 +4464,13 @@ const handleGenerateSummaryReport = () => {
                                             >
                                               Yes
                                             </span>
+                                            
                                             <span
-                                              role="button"
-                                              onClick={() => handleToggleCell(colName, 'B')}
+                                              role={canEdit ? 'button' : undefined}
+                                              onClick={canEdit ? () => handleToggleCell(colName, 'B') : undefined}
                                               className={
-                                                'px-2 py-[1px] rounded-full border text-[10px] cursor-pointer ' +
+                                                'px-2 py-[1px] rounded-full border text-[10px] ' +
+                                                (canEdit ? 'cursor-pointer ' : 'cursor-not-allowed opacity-60 ') +
                                                 (isNo
                                                   ? 'bg-red-100 text-red-700 border-red-300'
                                                   : 'text-gray-500 border-gray-200 hover:bg-red-50')
@@ -4146,8 +4489,7 @@ const handleGenerateSummaryReport = () => {
                         );
                       })()}
                       
-                      {/* Original table view (unchanged A/B grid) */}
-                                            {/* Original table view with grouped totals/quarters */}
+                      {/* Original table view with grouped totals/quarters */}
                       <div className="overflow-x-auto">
                         {(() => {
                           const rawHeaders =
@@ -4191,15 +4533,42 @@ const handleGenerateSummaryReport = () => {
                           );
                           const baseHeaders = allHeaders.filter(h => !summarySet.has(h));
                       
+                          // Identify the skill column in this table
+                          const skillColumn =
+                            allHeaders.find(h => String(h || '').toLowerCase().includes('skill')) ||
+                            allHeaders[0];
+
+                          const sessionHeaders = baseHeaders.filter(h => h !== skillColumn);
+                      
+                          // Table key and currently active skill for this table
+                          const tableKey = tableIndex;
+                          const activeKey = activeSkillByTable[tableKey] || null;
+                      
                           // Build leaf columns (second header row + body)
                           const leafColumns = [];
+                          
+                          
+                        
+                          // Which header group should show dynamic A/B counts for this table?
+                          const phaseToGroupLabel = {
+                            '1st assmt': '1st Assmt',
+                            '1st Qtr':   'I Qr',
+                            '2nd Qtr':   'II Qr',
+                            '3rd Qtr':   'III Qr',
+                            '4th Qtr':   'IV Qr',
+                          };
+                          const activeSummaryGroup =
+                            phaseToGroupLabel[table.assessment_phase] || '1st Assmt';
                       
                           // Base columns: one cell, spanning both header rows
                           baseHeaders.forEach(h => {
+                            const isSkillCol = h === skillColumn;
                             leafColumns.push({
                               group: null,
                               header: String(h).replace(/^Session\s+/i, ''),
                               subLabel: null,
+                              isSkill: isSkillCol,
+                              fieldName: h,
                               getValue: row => row[h],
                             });
                           });
@@ -4305,35 +4674,194 @@ const handleGenerateSummaryReport = () => {
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
-                                {table.rows?.map((row, rowIdx) => (
-                                  <tr key={rowIdx} className="hover:bg-gray-50">
-                                    {leafColumns.map((col, cellIdx) => {
-                                      const raw = col.getValue(row);
-                                      const cellValue =
-                                        raw === undefined || raw === null || raw === ''
-                                          ? '-'
-                                          : raw;
-                                      const isA = cellValue === 'A';
-                                      const isB = cellValue === 'B';
-                                      return (
-                                        <td
-                                          key={cellIdx}
-                                          className={`px-2 py-1 whitespace-nowrap text-xs font-semibold ${
-                                            col.group ? 'text-center' : 'text-left'
-                                          } ${
-                                            isA
-                                              ? 'text-blue-600'
-                                              : isB
-                                              ? 'text-red-600'
-                                              : 'text-gray-900'
-                                          }`}
-                                        >
-                                          {cellValue}
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                ))}
+                                {table.rows?.map((row, rowIdx) => {
+                                  const rawSkillVal = row[skillColumn];
+                                  const normalizedSkill = normalizeSectionKey(rawSkillVal);
+                                  const rowSkillKey = normalizedSkill || null;
+                                  const isRowSelected = rowSkillKey && activeKey === rowSkillKey;
+                                  const phase = table.assessment_phase || '1st assmt';
+                                  const overridesForPhase = (table.quarterOverrides && table.quarterOverrides[phase]) || {};
+                              
+                                  // Dynamic A/B counts for THIS row from the session columns
+                                  const { aCount, bCount } = (() => {
+                                    let a = 0;
+                                    let b = 0;
+                                    sessionHeaders.forEach(colName => {
+                                      const raw = row[colName];
+                                      const baseVal =
+                                        typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+                                      const cellKey = `${rowIdx}:${colName}`;
+                                      const override = overridesForPhase[cellKey];
+                                  
+                                      const v = override || baseVal;
+                                      if (v === 'A') a += 1;
+                                      else if (v === 'B') b += 1;
+                                    });
+                                    return { aCount: a, bCount: b };
+                                  })();
+                              
+                                  return (
+                                    <tr
+                                      key={rowIdx}
+                                      className={
+                                        'hover:bg-gray-50 ' +
+                                        (isRowSelected ? 'bg-[#FFEBD7]' : '')
+                                      }
+                                    >
+                                      {leafColumns.map((col, cellIdx) => {
+                                        // Determine if this cell is one of the summary A/B cells
+                                        const isSummaryCell =
+                                          !!col.group && col.group === activeSummaryGroup;
+                                        let cellValue;
+                              
+                                        if (isSummaryCell) {
+                                          const label = (col.subLabel || col.header || '').toUpperCase();
+                                          if (label === 'A') {
+                                            cellValue = aCount || '0';
+                                          } else if (label === 'B') {
+                                            cellValue = bCount || '0';
+                                          } else {
+                                            cellValue = '-';
+                                          }
+                                        } else {
+                                          const raw = col.getValue(row);
+                                          cellValue =
+                                            raw === undefined || raw === null || raw === ''
+                                              ? '-'
+                                              : raw;
+                                        }
+                              
+                                        const fieldName = col.fieldName;
+                                        const isSessionBaseCell =
+                                          !col.group && !col.isSkill && fieldName && sessionHeaders.includes(fieldName);
+                                        const cellKey = isSessionBaseCell ? `${rowIdx}:${fieldName}` : null;
+                                        const hasOverrideToA =
+                                          !!(cellKey && overridesForPhase[cellKey] === 'A');
+                                        
+                                        
+                                        
+                                        // For color: just use the actual letter we see (A = blue, B = red)
+                                        const isAVisual = !isSummaryCell && cellValue === 'A';
+                                        const isBVisual = !isSummaryCell && cellValue === 'B';
+                                        
+                                        let textClass;
+                                        if (isSummaryCell) textClass = 'text-gray-900 ';
+                                        else if (isAVisual) textClass = 'text-blue-600 ';
+                                        else if (isBVisual) textClass = 'text-red-600 ';
+                                        else textClass = 'text-gray-900 ';
+
+                                        let cellInner = cellValue;
+                                        if (
+                                          isSessionBaseCell &&
+                                          cellValue === 'B' &&
+                                          hasOverrideToA &&
+                                          !isSummaryCell
+                                        ) {
+                                          if (phase === '1st Qtr') {
+                                            // 1st Qtr: 3 soft horizontal lines around the B
+                                            cellInner = (
+                                              <span className="relative flex items-center justify-center w-full h-full">
+                                                <span className="relative z-10">{cellValue}</span>
+                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[46%]" />
+                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-1/2 -translate-y-1/2" />
+                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[54%]" />
+                                              </span>
+                                            );
+                                          } else if (phase === '2nd Qtr') {
+                                            // 2nd Qtr: 3 soft vertical lines around the B
+                                            cellInner = (
+                                              <span className="relative flex items-center justify-center w-full h-full">
+                                                <span className="relative z-10">{cellValue}</span>
+                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[46%]" />
+                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-1/2 -translate-x-1/2" />
+                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[54%]" />
+                                              </span>
+                                            );
+                                          } else if (phase === '3rd Qtr') {
+                                            // 3rd Qtr: compact grid around the B
+                                            cellInner = (
+                                              <span className="relative flex items-center justify-center w-full h-full">
+                                                <span className="relative z-10">{cellValue}</span>
+                                                {/* horizontal */}
+                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[46%]" />
+                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-1/2 -translate-y-1/2" />
+                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[54%]" />
+                                                {/* vertical */}
+                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[46%]" />
+                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-1/2 -translate-x-1/2" />
+                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[54%]" />
+                                              </span>
+                                            );
+                                          } else if (phase === '4th Qtr') {
+                                            // 4th Qtr: 3 diagonal strokes that cross the B but stay tight
+                                            cellInner = (
+                                              <span className="relative flex items-center justify-center w-full h-full">
+                                                <span className="relative z-10">{cellValue}</span>
+                                                <span className="pointer-events-none absolute inset-0">
+                                                  <span
+                                                    className="absolute left-[-20%] right-[-20%] top-1/2 h-px bg-blue-500/80"
+                                                    style={{ transform: 'rotate(45deg)' }}
+                                                  />
+                                                  <span
+                                                    className="absolute left-[-20%] right-[-20%] top-[46%] h-px bg-blue-500/80"
+                                                    style={{ transform: 'rotate(45deg)' }}
+                                                  />
+                                                  <span
+                                                    className="absolute left-[-20%] right-[-20%] top-[54%] h-px bg-blue-500/80"
+                                                    style={{ transform: 'rotate(45deg)' }}
+                                                  />
+                                                </span>
+                                              </span>
+                                            );
+                                          }
+                                        }
+                              
+                                        let onClick;
+                                        let extraClass = '';
+                              
+                                        // Clicking the skill column selects the skill and opens questions
+                                        if (col.isSkill && rowSkillKey) {
+                                          onClick = () => {
+                                            setActiveSkillByTable(prev => {
+                                              const isSame = prev[tableKey] === rowSkillKey;
+                                              const nextKey = isSame ? undefined : rowSkillKey;
+                              
+                                              setQuestionsOpenByTable(prevOpen => ({
+                                                ...prevOpen,
+                                                [tableKey]: !!nextKey,
+                                              }));
+                              
+                                              return {
+                                                ...prev,
+                                                [tableKey]: nextKey,
+                                              };
+                                            });
+                                          };
+                                          extraClass =
+                                            ' cursor-pointer ' +
+                                            (isRowSelected
+                                              ? 'font-semibold text-gray-900 border-l-4 border-[#E38B52]'
+                                              : 'hover:bg-orange-50');
+                                        }
+                              
+                                        return (
+                                          <td
+                                            key={cellIdx}
+                                            onClick={onClick}
+                                            className={
+                                              `relative px-2 py-1 whitespace-nowrap text-xs font-semibold ` +
+                                              (col.group ? 'text-center ' : 'text-left ') +
+                                              textClass +
+                                              extraClass
+                                            }
+                                          >
+                                            {cellInner}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           );
