@@ -2,6 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from pydantic import BaseModel
 import os
+import json
 import logging
 from datetime import date
 
@@ -158,6 +159,13 @@ def ai_summarize_reports(
 
     if not settings.HUGGINGFACE_API_TOKEN:
         raise HTTPException(status_code=503, detail="HUGGINGFACE_API_TOKEN environment variable not set on server.")
+    
+    # Debug: Log the token being used (first 15 chars only for security)
+    token_prefix = settings.HUGGINGFACE_API_TOKEN[:15] if settings.HUGGINGFACE_API_TOKEN else "NONE"
+    print(f"\n{'='*60}")
+    print(f"AI SUMMARY REQUEST - Token prefix: {token_prefix}...")
+    print(f"Student: {payload.student_id}, Model: {payload.model}")
+    print(f"{'='*60}\n")
 
     # First, look up the student by string student_id to get the integer id
     from app.crud.student import student as crud_student
@@ -248,18 +256,28 @@ def _generate_comprehensive_analysis(reports, student, payload):
         )
         recommendations = _extract_generated_text(rec_result)
         
-        # 5. Main Summary - AI analyzes all report content (LOW temperature for accuracy)
+        # 5. Main Summary - AI analyzes all report content
         main_summary_prompt = _build_main_summary_prompt_with_fewshot(reports, student)
         main_result = client.chat_completion(
             messages=[{"role": "user", "content": main_summary_prompt}],
             model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
-            max_tokens=800,  # Increased to ensure all 5 sections complete without cutoff
-            temperature=0.3  # Lower temperature for more faithful synthesis
+            max_tokens=2000,  # Large enough for detailed clinical paragraphs per section
+            temperature=0.5   # Balanced: faithful to data but with professional elaboration
         )
         main_summary = _extract_generated_text(main_result)
         
     except Exception as e:
-        logging.exception("AI analysis failed, using fallback")
+        import traceback
+        error_details = traceback.format_exc()
+        logging.error(f"AI analysis failed with error: {str(e)}")
+        logging.error(f"Full traceback:\n{error_details}")
+        # Print to console for debugging
+        print(f"\n{'='*60}")
+        print(f"AI ANALYSIS ERROR:")
+        print(f"Error: {str(e)}")
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Traceback:\n{error_details}")
+        print(f"{'='*60}\n")
         # Fallback to data-driven analysis without AI
         return _generate_fallback_analysis(reports, student, payload, improvement_metrics, date_range)
     
@@ -912,6 +930,26 @@ def _generate_fallback_analysis(reports, student, payload, metrics, date_range):
     )
 
 # ============================================================================
+# HELPER: Parse goals_achieved (may be JSON string or dict)
+# ============================================================================
+
+def _parse_goals_achieved(goals_achieved):
+    """Parse goals_achieved field which may be a JSON string, dict, or None.
+    Returns a dict or None."""
+    if goals_achieved is None:
+        return None
+    if isinstance(goals_achieved, dict):
+        return goals_achieved
+    if isinstance(goals_achieved, str):
+        try:
+            parsed = json.loads(goals_achieved)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            logging.warning(f"Could not parse goals_achieved JSON string: {goals_achieved[:100]}")
+    return None
+
+# ============================================================================
 # FEW-SHOT PROMPT BUILDERS WITH PROFESSIONAL EXAMPLES
 # ============================================================================
 
@@ -921,17 +959,18 @@ def _extract_section_titles(reports):
     
     for report in reports:
         if report.goals_achieved:
-            # If goals_achieved is a dict, get the keys (section titles)
-            if isinstance(report.goals_achieved, dict):
-                section_titles.update(report.goals_achieved.keys())
-            # If it's a string, try to parse common section patterns
+            parsed = _parse_goals_achieved(report.goals_achieved)
+            if isinstance(parsed, dict):
+                # Get section labels from the parsed dict values
+                for key, value in parsed.items():
+                    if isinstance(value, dict) and value.get('label'):
+                        section_titles.add(value['label'])
+                    else:
+                        section_titles.add(key)
             elif isinstance(report.goals_achieved, str):
-                # Look for common patterns like "Section Name:" or "**Section Name**"
+                # Fallback: try to parse common section patterns from raw text
                 import re
-                # Match patterns like "Word Word:" at start of line
-                # Updated to handle: "Receptive Language:", "Oral Motor and OPT:", etc.
                 matches = re.findall(r'^([A-Z][A-Za-z\s&(),]+(?:\s+and\s+[A-Z]+)?[A-Za-z\s]*):', report.goals_achieved, re.MULTILINE)
-                # Clean up matches (strip trailing spaces)
                 section_titles.update([m.strip() for m in matches if m.strip()])
     
     # Return as sorted list for consistency
@@ -943,27 +982,29 @@ def _extract_section_content(report, section_name):
     if not report.goals_achieved:
         return ""
     
-    # If goals_achieved is a dict
-    if isinstance(report.goals_achieved, dict):
-        content = report.goals_achieved.get(section_name, "")
-        if not content:
-            return ""
-        if isinstance(content, dict):
-            # If the value is a dict with 'notes' or similar
-            return str(content.get('notes', content.get('text', str(content))))[:300]
-        return str(content)[:300]
+    parsed = _parse_goals_achieved(report.goals_achieved)
     
-    # If goals_achieved is a string, try to extract the section
+    if isinstance(parsed, dict):
+        # Try matching by label first (new format), then by key
+        for key, value in parsed.items():
+            if isinstance(value, dict):
+                label = value.get('label', '')
+                notes = value.get('notes', '')
+                if (label == section_name or key == section_name) and notes and notes.strip():
+                    return notes.strip()[:300]
+            elif isinstance(value, str) and value.strip():
+                if key == section_name:
+                    return value.strip()[:300]
+        return ""
+    
+    # If goals_achieved is a raw string (not JSON), try regex extraction
     if isinstance(report.goals_achieved, str):
         import re
-        # Try to find the section and extract text until next section or end
-        # More precise pattern to match section titles with "and" phrases
         pattern = rf"^{re.escape(section_name)}:\s*(.*?)(?=\n[A-Z][A-Za-z\s&(),]+(?:\s+and\s+[A-Z]+)?[A-Za-z\s]*:|$)"
         match = re.search(pattern, report.goals_achieved, re.DOTALL | re.MULTILINE)
         if match:
             return match.group(1).strip()[:300]
     
-    # NO fallback to progress_notes - only return content from matching section
     return ""
 
 
@@ -1210,191 +1251,9 @@ NOW GENERATE RECOMMENDATIONS FOR:
 
 
 def _build_main_summary_prompt_with_fewshot(reports, student):
-    """Build main progress summary prompt with few-shot examples and therapy-specific sections."""
+    """Build main summary prompt with section-based bullet point format."""
     import logging
     
-    student_name = getattr(student, 'name', 'Student')
-    
-    # Determine therapy type from first report
-    therapy_type = None
-    for report in reports:
-        if hasattr(report, 'therapy_type') and report.therapy_type:
-            therapy_type = report.therapy_type
-            break
-    
-    # Define 5 sections per therapy type
-    therapy_sections = {
-        "Speech Therapy": [
-            "Receptive Language Skills (Comprehension)",
-            "Expressive Language Skills",
-            "Oral Motor & Oral Placement Therapy (OPT) Goals",
-            "Pragmatic Language Skills (Social Communication)",
-            "Narrative Skills"
-        ],
-        "Behavioral Therapy": [
-            "Behavior Regulation & Self-Control",
-            "Attention, Compliance & Task Engagement",
-            "Emotional Regulation Skills",
-            "Social Behavior & Interaction Skills",
-            "Adaptive Behavior & Functional Skills"
-        ],
-        "Cognitive Therapy": [
-            "Attention & Concentration Skills",
-            "Memory & Recall Skills",
-            "Problem Solving & Reasoning Skills",
-            "Executive Functioning Skills",
-            "Cognitive Flexibility & Processing Skills"
-        ],
-        "Occupational Therapy": [
-            "Fine Motor Skills",
-            "Sensory Processing & Integration",
-            "Visual-Motor Integration Skills",
-            "Activities of Daily Living (ADL)",
-            "Handwriting & Pre-Academic Skills"
-        ],
-        "Physical Therapy": [
-            "Gross Motor Skills",
-            "Balance & Postural Control",
-            "Strength & Endurance",
-            "Coordination & Motor Planning",
-            "Functional Mobility Skills"
-        ]
-    }
-    
-    # Get the 5 sections for this therapy type
-    section_titles = therapy_sections.get(therapy_type, therapy_sections["Speech Therapy"])
-    
-    therapy_label = therapy_type if therapy_type else "Therapy"
-    
-    # Build a SIMPLE, DIRECT prompt
-    prompt = f"""TASK: Synthesize therapy session notes into a professional progress summary.
-
-INSTRUCTIONS:
-1. Read all session notes below for each section
-2. For each section, create 2-4 concise bullet points covering:
-   - Progress made
-   - Areas needing support
-   - Any regressions or fluctuations
-3. Merge similar ideas from multiple sessions
-4. Rewrite in concise, professional language (do not copy verbatim)
-5. Keep 2-3 sentences maximum per bullet point
-6. Organize bullets by domain (section)
-7. If a section has notes, synthesize them. If no notes, write "No documented data for this area"
-
-INPUT DATA:
-
-Student: {student_name}
-Therapy: {therapy_label}
-Sessions: {len(reports)}
-
-"""
-    
-    # Provide section data - SIMPLIFIED
-    for title in section_titles:
-        prompt += f"\n{title}:\n"
-        
-        # Collect all notes for this section
-        all_notes = []
-        for report in reports:
-            goals_data = report.goals_achieved
-            
-            # Parse if it's a JSON string
-            if isinstance(goals_data, str):
-                try:
-                    import json
-                    goals_data = json.loads(goals_data)
-                except:
-                    logging.warning(f"Report ID {report.id}: Could not parse goals_achieved JSON string")
-                    continue
-            
-            if isinstance(goals_data, dict):
-                logging.info(f"Report ID {report.id}: goals_achieved keys = {list(goals_data.keys())}")
-                
-                # Map section titles to possible key names (old format compatibility)
-                key_mappings = {
-                    "Receptive Language Skills (Comprehension)": ["receptive_language", "receptive"],
-                    "Expressive Language Skills": ["expressive_language", "expressive"],
-                    "Oral Motor & Oral Placement Therapy (OPT) Goals": ["oral_motor_opt", "oral_motor", "opt"],
-                    "Pragmatic Language Skills (Social Communication)": ["pragmatic_language", "pragmatic"],
-                    "Narrative Skills": ["narrative_skills", "narrative"],
-                    "Behavior Regulation & Self-Control": ["behavior_regulation", "behavior"],
-                    "Attention, Compliance & Task Engagement": ["attention_compliance", "attention"],
-                    "Emotional Regulation Skills": ["emotional_regulation", "emotional"],
-                    "Social Behavior & Interaction Skills": ["social_behavior", "social"],
-                    "Adaptive Behavior & Functional Skills": ["adaptive_behavior", "adaptive"],
-                    "Attention & Concentration Skills": ["attention_concentration", "attention"],
-                    "Memory & Recall Skills": ["memory_recall", "memory"],
-                    "Problem Solving & Reasoning Skills": ["problem_solving", "problem"],
-                    "Executive Functioning Skills": ["executive_functioning", "executive"],
-                    "Cognitive Flexibility & Processing Skills": ["cognitive_flexibility", "cognitive"],
-                    "Fine Motor Skills": ["fine_motor", "fine"],
-                    "Sensory Processing & Integration": ["sensory_processing", "sensory"],
-                    "Visual-Motor Integration Skills": ["visual_motor", "visual"],
-                    "Activities of Daily Living (ADL)": ["daily_living", "adl"],
-                    "Handwriting & Pre-Academic Skills": ["handwriting"],
-                    "Gross Motor Skills": ["gross_motor", "gross"],
-                    "Balance & Postural Control": ["balance_postural", "balance"],
-                    "Strength & Endurance": ["strength_endurance", "strength"],
-                    "Coordination & Motor Planning": ["coordination_planning", "coordination"],
-                    "Functional Mobility Skills": ["functional_mobility", "mobility"]
-                }
-                
-                possible_keys = key_mappings.get(title, [])
-                
-                for key, value in goals_data.items():
-                    if isinstance(value, dict):
-                        # New format: check label match
-                        label_match = value.get('label') == title
-                        # Old format: check key match
-                        key_match = key in possible_keys
-                        has_notes = value.get('notes') and value['notes'].strip()
-                        
-                        logging.info(f"  Key '{key}': label='{value.get('label')}', expected='{title}', label_match={label_match}, key_match={key_match}, has_notes={has_notes}")
-                        
-                        if (label_match or key_match) and has_notes:
-                            all_notes.append(value['notes'])
-                            logging.info(f"  -> MATCHED! Added note: {value['notes'][:100]}")
-            else:
-                logging.warning(f"Report ID {report.id}: goals_achieved is type {type(goals_data)} after parsing")
-        
-        logging.info(f"Section '{title}': Total notes found = {len(all_notes)}")
-        
-        if all_notes:
-            # Show the notes clearly
-            for i, note in enumerate(all_notes[:3], 1):  # Max 3 sessions
-                prompt += f"  {note[:300]}\n"
-        else:
-            prompt += f"  (No notes recorded)\n"
-    
-    prompt += f"\n\nOUTPUT FORMAT:\n\n{therapy_label} – Progress Summary\n\n"
-    
-    # Collect any notes to determine if we have data
-    has_any_notes = False
-    for title in section_titles:
-        for report in reports:
-            if isinstance(report.goals_achieved, dict):
-                for key, value in report.goals_achieved.items():
-                    if isinstance(value, dict):
-                        if value.get('label') == title and value.get('notes') and value['notes'].strip():
-                            has_any_notes = True
-                            break
-    
-    # Add clear extraction examples
-    if has_any_notes:
-        prompt += f"EXAMPLES OF CORRECT SYNTHESIS:\n\n"
-        prompt += f"If Session 1 says: 'Uses 3-4 word utterances' and Session 2 says: 'Uses 4-5 word utterances spontaneously'\n"
-        prompt += f"Synthesize to:\n- Demonstrates progressive increase in utterance length from 3-4 words to 4-5 words, with increased spontaneity observed across sessions\n\n"
-        prompt += f"If notes say: 'Difficulty with tasks. Requires maximum support. Limited progress observed.'\n"
-        prompt += f"Synthesize to:\n- Continues to demonstrate difficulty with task completion and requires maximum support\n- Limited progress observed; continued intervention recommended\n\n"
-        prompt += f"CRITICAL: Match the tone from notes. If notes show progress, bullets show progress. If notes show difficulties, bullets show difficulties.\n\n"
-    
-    prompt += f"NOW CREATE THE SUMMARY:\n"
-    prompt += f"For each of the 5 sections below, synthesize 2-4 professional bullet points from all session notes.\n"
-    prompt += f"Merge observations across sessions. Highlight progress, support needs, and any fluctuations.\n"
-    prompt += f"If a section has notes, synthesize them professionally. If '(No notes recorded)', write 'No documented data for this area'.\n"
-    
-    return prompt
-    """Build main summary prompt with section-based bullet point format."""
     student_name = getattr(student, 'name', 'Student')
     
     # Detect therapy type from reports
@@ -1444,286 +1303,48 @@ Sessions: {len(reports)}
     # Get the 5 sections for this therapy type
     section_titles = therapy_sections.get(therapy_type, therapy_sections["Speech Therapy"])
     
-    # Therapy-specific examples
-    examples = {
-        "Speech Therapy": """
-EXAMPLE FORMAT (Speech Therapy with POSITIVE findings):
-
-Speech Therapy – Progress Summary
-
-Receptive Language Skills (Comprehension)
-- Demonstrates strong progress in receptive language
-- Consistently follows 3-step commands
-- Comprehends basic prepositions reliably
-- Recognizes personal pronouns with minimal support
-
-Expressive Language Skills
-- Uses 4-5 word utterances spontaneously
-- Expresses needs and describes actions independently
-- Retells simple stories using picture cues
-- Requires minimal to moderate assistance depending on complexity
-
-Oral Motor & Oral Placement Therapy (OPT) Goals
-- Shows steady improvement in oral motor skills
-- Participates actively in exercises
-- Lip closure and jaw stability improving
-- Requires reduced cueing across sessions
-
-Pragmatic Language Skills (Social Communication)
-- Engages in reciprocal communication
-- Maintains 2-3 turn exchanges with adults and peers
-- Uses greetings and comments consistently
-- Appropriateness in interactions is emerging
-
-Narrative Skills
-- Demonstrates clear progress in narrative development
-- Sequences 3-5 picture cards accurately
-- Narrates events meaningfully
-- Shows increased enjoyment and confidence
-""",
-        "Speech Therapy Old": """
-EXAMPLE FORMAT (Speech Therapy):
-
-Speech Therapy – Progress Summary
-
-Receptive Language Skills (Comprehension)
-- Follows multi-step directions with support
-- Understanding of basic concepts is improving
-- Benefits from visual cues
-
-Expressive Language Skills
-- Uses short phrases to communicate needs
-- Sentence length is increasing
-- Requires occasional prompting
-
-Oral Motor & Oral Placement Therapy (OPT) Goals
-- Participates actively in oral motor exercises
-- Lip closure and jaw stability are improving
-- Continued practice is beneficial
-
-Pragmatic Language Skills (Social Communication)
-- Engages in simple social interactions
-- Turn-taking skills are emerging
-- Uses basic greetings inconsistently
-
-Narrative Skills
-- Retells short stories with picture support
-- Sequencing skills are developing
-- Requires guidance for detailed narration
-""",
-        "Behavioral Therapy": """
-EXAMPLE FORMAT (Behavioral Therapy):
-
-Behavioral Therapy – Progress Summary
-
-Behavior Regulation & Self-Control
-- Demonstrates improved behavioral regulation during structured tasks
-- Impulsivity has reduced with verbal reminders
-- Continues to require support during unstructured activities
-
-Attention, Compliance & Task Engagement
-- Sustains attention for short, structured activities
-- Compliance improves with predictable routines
-- Requires redirection to complete tasks consistently
-
-Emotional Regulation Skills
-- Beginning to identify basic emotions
-- Uses simple calming strategies with adult guidance
-- Frustration tolerance is improving but remains limited
-
-Social Behavior & Interaction Skills
-- Engages appropriately in guided peer interactions
-- Turn-taking skills are emerging
-- Benefits from adult facilitation during group activities
-
-Adaptive Behavior & Functional Skills
-- Shows increasing independence in daily routines
-- Completes familiar tasks with verbal cues
-- Continued practice needed for efficiency and consistency
-""",
-        "Cognitive Therapy": """
-EXAMPLE FORMAT (Cognitive Therapy showing NEGATIVE findings):
-
-Cognitive Therapy – Progress Summary
-
-Attention & Concentration Skills
-- Demonstrates inconsistent attention across tasks
-- Quickly disengages during structured tasks
-- Requires frequent verbal and physical redirection
-- No notable improvement observed
-
-Memory & Recall Skills
-- Recalls familiar information only with visual cues
-- Retention of new material remains poor
-- Requires repeated prompts
-- Progress in memory skills is minimal
-
-Problem Solving & Reasoning Skills
-- Unable to complete tasks independently
-- Responses are trial-and-error
-- Limited evidence of logical reasoning
-
-Executive Functioning Skills
-- Demonstrates difficulty initiating tasks
-- Requires continuous adult support
-- Multi-step activities not completed independently
-- Limited carryover of skills across sessions
-
-Cognitive Flexibility & Processing Skills
-- Shows resistance to changes in routine
-- Requires additional time to transition
-- Processing speed remains slow
-- Task completion is delayed despite support
-""",
-        "Occupational Therapy": """
-EXAMPLE FORMAT (Occupational Therapy):
-
-Occupational Therapy – Progress Summary
-
-Fine Motor Skills
-- Improved hand strength and grasp patterns
-- Increased control during fine motor tasks
-- Precision continues to develop
-
-Sensory Processing & Integration
-- Responds more consistently to sensory input
-- Occasional sensory-seeking behaviors observed
-- Regulation improves with structured sensory activities
-
-Visual-Motor Integration Skills
-- Coordinates visual input with motor actions
-- Accuracy improves with visual cues
-- Skills are developing steadily
-
-Activities of Daily Living (ADL)
-- Participates in self-care tasks with assistance
-- Independence is gradually increasing
-- Continued practice required
-
-Handwriting & Pre-Academic Skills
-- Engages in pre-writing activities
-- Emerging control over writing tools
-- Letter formation requires continued support
-""",
-        "Physical Therapy": """
-EXAMPLE FORMAT (Physical Therapy):
-
-Physical Therapy – Progress Summary
-
-Gross Motor Skills
-- Demonstrates improved age-appropriate movement skills
-- Increased confidence during play-based activities
-- Control continues to strengthen
-
-Balance & Postural Control
-- Improved static balance with reduced support
-- Dynamic balance is emerging
-- Occasional instability during complex movements
-
-Strength & Endurance
-- Increased lower extremity strength observed
-- Improved tolerance for therapy activities
-- Requires fewer rest breaks
-
-Coordination & Motor Planning
-- Completes simple movement sequences with cues
-- Bilateral coordination is improving
-- Motor planning skills are emerging
-
-Functional Mobility Skills
-- Moves independently in familiar environments
-- Transitions between positions with minimal assistance
-- Functional mobility continues to improve
-"""
-    }
-    
-    # Build prompt with therapy-specific example
+    # Build prompt with therapy-specific context
     therapy_label = therapy_type if therapy_type else "Therapy"
-    example = examples.get(therapy_type, examples["Speech Therapy"])
     
-    prompt = f"""You are a clinical documentation assistant for therapy progress summaries.
+    prompt = f"""You are an experienced clinical therapist writing a detailed professional progress summary report.
 
-Generate a PROGRESS SUMMARY with concise bullet points for EXACTLY 5 sections based ONLY on the actual therapy session notes provided.
+Generate a comprehensive {therapy_label} Progress Summary for a student based on their actual therapy session notes.
 
-*** MUTUAL EXCLUSION RULE (ABSOLUTE) ***
-If ANY observation, behavior, difficulty, or performance is described in a section,
-"No data available" MUST NOT appear in that section.
-You CANNOT have both observations AND "no data available" in the same section.
-
-CRITICAL DOCUMENTATION RULES:
-- You are an EXTRACTOR, not a writer - extract ONLY what is written, do NOT create new content
-- COPY the tone from notes: positive input = positive output, negative input = negative output
-- Do NOT invert findings (never turn positive into negative or negative into positive)
-- Do NOT fabricate difficulties, struggles, or limitations not mentioned in the notes
-- Do NOT add improvement, progress, or gains unless clearly stated in the notes
-- If notes say "strong progress", write "strong progress" - do NOT change to "struggles" or "difficulty"
-- If notes say "difficulty", write "difficulty" - do NOT change to "improving" or "progress"
-- Match the severity, tone, and direction of progress EXACTLY as described in notes
-- Avoid generic therapy language ("developing", "emerging", "improving") unless present in the actual notes
-- Do NOT fabricate or infer anything that is not explicitly documented
-
-CRITICAL: "NO DATA AVAILABLE" vs NEGATIVE FINDINGS:
-- Use "No data available for this area" ONLY if the section is completely empty or missing
-- Difficulties, limitations, inconsistent performance, lack of improvement, or regression ARE VALID CLINICAL DATA
-- NEGATIVE findings MUST be summarized explicitly - they are NOT "no data available"
-- Do NOT replace documented difficulties with "no data available" or "no documented progress"
-- If notes describe challenges, explicitly state those challenges in the summary
-- Negative clinical findings are important data and must be reflected accurately
-
-DATA VALIDITY RULE (CRITICAL):
-- ANY description of behavior, ability, difficulty, performance, participation, support level, or task completion IS VALID DATA
-- Valid data includes: "struggles with...", "refuses to...", "unable to...", "requires maximum support", "no progress", etc.
-- All such data MUST be summarized - it is NOT "no data available"
-- "No data available" may ONLY be used when a section is completely absent or contains zero descriptive text
-- Even negative observations like "no improvement" or "continues to struggle" are VALID DATA to summarize
-
-STRICT CONSISTENCY RULES:
-- A section MUST NOT contain both observations AND "no data available"
-- If ANY performance, difficulty, or progress is described in the input, summarize it - do NOT add "no data available"
-- Use "no data available" ONLY when the input section is completely empty with no text
-- Do NOT replace positive progress with difficulty unless explicitly stated in the notes
-- Do NOT downgrade positive input into neutral or negative summaries
-- Do NOT upgrade negative input into positive summaries
-- Match the tone exactly: positive stays positive, negative stays negative, neutral stays neutral
-
-SECTION COMPLETENESS RULE:
-- If a therapy section appears in ANY session report, the summary MUST include that section with content
-- "No data available" is permitted ONLY if the section is absent from ALL input reports
-- Even if only ONE report has notes for a section, use those notes in the summary
-- Do NOT write "no data available" if the section has notes in any of the session reports
-
-CRITICAL FORMATTING RULES:
+FORMAT REQUIREMENTS:
 - Title: "{therapy_label} – Progress Summary"
-- Generate EXACTLY 5 sections (no more, no less)
-- Use ONLY the exact section titles provided below
-- Each section gets 2-4 bullet points based on actual notes (use - for bullets)
-- Bullet points should be concise (1 line each, max 15 words)
-- Focus on what is ACTUALLY documented in the notes
+- Generate EXACTLY 5 sections using bold section headers (** around titles)
+- Each section must have 2-3 detailed bullet points (use • for bullets)
+- Each bullet point must be 2-3 COMPLETE SENTENCES providing clinical analysis
+- For each bullet, describe what the student can do, analyze progress across sessions, and suggest what the therapist should focus on
+- Write in professional clinical language suitable for a therapy report
 - NO dates, NO session numbers
-- Use the exact tense and phrasing from the notes
 
-{example}
+WRITING STYLE:
+- Write as a professional therapist synthesizing observations across multiple sessions
+- For each finding, explain the observation, analyze what it means for the student's development, and note implications for continued therapy
+- Use phrases like: "The student has demonstrated...", "This progress is likely due to...", "The therapist should continue to...", "Despite this progress...", "...remains a concern, highlighting the need for..."
+- When notes show improvement across sessions, describe the trajectory of improvement
+- When notes show difficulties, acknowledge them honestly and suggest continued support
+- Be detailed and thorough - each bullet should be a mini-paragraph of 2-3 sentences
 
-CONTENT GUIDELINES:
-- Extract ONLY what is explicitly written in the session notes
-- Preserve the exact tone: if notes are positive, summary is positive; if negative, summary is negative
-- ANY descriptive text is valid data - behavior, ability, difficulty, performance, participation, support level, task completion
-- If notes say "excellent progress", write "excellent progress" - do NOT downgrade to "improving"
-- If notes say "minimal progress", write "minimal progress" - do NOT upgrade to "is improving"
-- If notes say "difficulty persists", write "difficulty persists" - this IS clinical data, NOT "no data available"
-- If notes say "no improvement observed", write "no improvement observed" - this IS clinical data, NOT "no data available"
-- If notes say "regression noted", write "regression noted" - this IS clinical data
-- If notes say "refuses tasks", write "refuses tasks" - this IS clinical data, NOT "no data available"
-- If notes say "unable to complete", write "unable to complete" - this IS clinical data, NOT "no data available"
-- If notes say "requires maximum support", write "requires maximum support" - do not soften
-- If notes describe inconsistent performance, state "inconsistent performance" - this IS clinical data
-- If notes describe challenges or limitations, explicitly include those - these ARE clinical data
-- Be honest and accurate - clinical documentation requires truthfulness
-- Do NOT add positive spin to negative or neutral observations
-- Do NOT add negative spin to positive observations
-- ONLY write "No data available for this area" when the section is literally empty with no descriptive text at all
-- Remember: ANY description (positive, negative, neutral) is VALID DATA and must be documented
-- NEVER mix observations with "no data available" in the same section
+CRITICAL RULES:
+- Base ALL content on the actual session notes provided below - do NOT invent observations not in the data
+- Preserve the tone: positive notes = positive summary, negative notes = honest about difficulties
+- If a section has notes, synthesize them into detailed clinical paragraphs
+- If a section has NO notes at all (marked [NO NOTES]), write "No documented data for this area" with ONE bullet only
+- Do NOT mix observations and "no data" in the same section
+- Do NOT invert findings (don't turn positive into negative or vice versa)
+
+EXAMPLE (showing desired detail level):
+
+**Receptive Language Skills (Comprehension)**
+• The student has demonstrated significant improvement in comprehension and understanding, particularly when presented with information at a slower pace. This progress is likely due to increased repetition and targeted exposure during therapy sessions.
+• However, there is still a need for continued repetition and practice to solidify these skills. The therapist should aim to incorporate more varied and complex conversations to challenge the student's comprehension abilities.
+• Overall receptive language skills have shown consistent improvement across sessions, indicating a positive response to the current therapeutic approach.
+
+**Expressive Language Skills**
+• The student has made notable progress in expressing their current feelings and emotions, showcasing an increase in verbal communication. This improvement is likely due to targeted exercises and strategies developed in previous sessions.
+• Despite this progress, the student still faces challenges in certain areas of expression, which may require additional support and modified strategies. The therapist should continue to work on developing these skills through varied activities.
 
 NOW GENERATE FOR THIS STUDENT:
 
@@ -1731,7 +1352,7 @@ Student Name: {student_name}
 Therapy Type: {therapy_label}
 Total Sessions: {len(reports)}
 
-REQUIRED SECTIONS (Use these EXACT titles in this EXACT order):
+REQUIRED SECTIONS (Use these EXACT titles in this EXACT order, with ** bold markers):
 """
     
     # List the exact 5 sections
@@ -1747,15 +1368,12 @@ REQUIRED SECTIONS (Use these EXACT titles in this EXACT order):
         # Collect all notes for this section by matching label
         all_notes = []
         for report in reports:
-            if isinstance(report.goals_achieved, dict):
-                # Debug logging
-                logging.info(f"Processing report for section '{title}': {list(report.goals_achieved.keys())}")
+            parsed = _parse_goals_achieved(report.goals_achieved)
+            if isinstance(parsed, dict):
+                logging.info(f"Processing report ID={report.id} for section '{title}': keys={list(parsed.keys())}")
                 
-                # Try direct key matching first (for backward compatibility)
-                for key, value in report.goals_achieved.items():
-                    # Handle both old format (direct string) and new format (dict with label)
+                for key, value in parsed.items():
                     if isinstance(value, dict):
-                        # New format: {checked: bool, notes: str, label: str}
                         label_match = value.get('label') == title
                         has_notes = value.get('notes') and value['notes'].strip()
                         logging.info(f"  Key '{key}': label='{value.get('label')}', match={label_match}, has_notes={has_notes}")
@@ -1763,17 +1381,10 @@ REQUIRED SECTIONS (Use these EXACT titles in this EXACT order):
                         if label_match and has_notes:
                             all_notes.append(value['notes'])
                     elif isinstance(value, str) and value.strip():
-                        # Old format: direct string value, match by key
-                        # Try to fuzzy match section title with key
                         if title.lower().replace(' ', '_').startswith(key.lower().replace(' ', '_')[:10]):
                             all_notes.append(value)
             else:
-                logging.warning(f"Report goals_achieved is not a dict: {type(report.goals_achieved)}")
-            
-            # Also check progress_notes as fallback if no section-specific notes found
-            if not all_notes and hasattr(report, 'progress_notes') and report.progress_notes:
-                # Use progress_notes only if it seems relevant to this section
-                pass  # Don't use as fallback to maintain accuracy
+                logging.warning(f"Report ID={report.id}: goals_achieved could not be parsed (type={type(report.goals_achieved)})")
         
         logging.info(f"Section '{title}': Found {len(all_notes)} notes")
         
@@ -1794,34 +1405,14 @@ REQUIRED SECTIONS (Use these EXACT titles in this EXACT order):
         else:
             prompt += f"  [NO NOTES IN ANY REPORT FOR THIS SECTION]\n"
     
-    prompt += f"\n\n*** CRITICAL INSTRUCTION - READ CAREFULLY ***\n"
-    prompt += f"You are an EXTRACTOR, not an interpreter. Your job is to COPY and CONDENSE, not to CREATE or CHANGE.\n"
-    prompt += f"\nRULE 1 - TONE MATCHING (CRITICAL):\n"
-    prompt += f"If notes say 'strong progress' → Summary says 'strong progress' (NOT 'struggles' or 'difficulty')\n"
-    prompt += f"If notes say 'difficulty with' → Summary says 'difficulty with' (NOT 'improving' or 'progress')\n"
-    prompt += f"NEVER invert the tone. Positive stays positive. Negative stays negative.\n"
-    prompt += f"\nRULE 2 - MUTUAL EXCLUSION:\n"
-    prompt += f"If a section has ANY observations, do NOT add 'No data available'\n"
-    prompt += f"You cannot have both bullets with observations AND 'No data available' in the same section.\n"
-    prompt += f"\nRULE 3 - NO FABRICATION:\n"
-    prompt += f"Do NOT add words like 'refuses', 'struggles', 'difficulty', 'inconsistent' unless they appear in the notes.\n"
-    prompt += f"Do NOT add words like 'progress', 'improving', 'developing' unless they appear in the notes.\n"
-    prompt += f"Extract and condense ONLY. Do not create new clinical observations.\n"
-    prompt += f"\nEXAMPLE - POSITIVE INPUT:\n"
-    prompt += f"Input: 'Leo demonstrates strong progress. Consistently follows 3-step commands.'\n"
-    prompt += f"WRONG: 'Refuses to follow multi-step directions' (FABRICATED NEGATIVE - DO NOT DO THIS)\n"
-    prompt += f"CORRECT: 'Demonstrates strong progress in following commands'\n"
-    prompt += f"\nEXAMPLE - NEGATIVE INPUT:\n"
-    prompt += f"Input: 'Child demonstrates inconsistent attention. Requires frequent redirection.'\n"
-    prompt += f"WRONG: 'Shows improving attention skills' (FABRICATED POSITIVE - DO NOT DO THIS)\n"
-    prompt += f"CORRECT: 'Demonstrates inconsistent attention, requires frequent redirection'\n"
-    prompt += f"\n\nNOW GENERATE: '{therapy_label} – Progress Summary' with ALL 5 section titles in order. For each section:\n"
-    prompt += f"- EXTRACT and CONDENSE the notes above - do NOT create new observations\n"
-    prompt += f"- COPY the tone: if notes are positive, bullets are positive; if notes are negative, bullets are negative\n"
-    prompt += f"- ONLY write 'No data available for this area' if you see '[NO NOTES IN ANY REPORT FOR THIS SECTION]' above\n"
-    prompt += f"- If you see 'Session note:' with text, you MUST create bullets from that text - NOT 'no data available'\n"
-    prompt += f"- MUTUAL EXCLUSION: Never mix observations with 'No data available' in the same section\n"
-    prompt += f"- NO FABRICATION: Do not add clinical terms (struggles/refuses/difficulty/progress/improving) unless in the notes\n"
+    prompt += f"\nIMPORTANT REMINDERS:\n"
+    prompt += f"- Write 2-3 detailed sentences per bullet point (• symbol), providing clinical analysis\n"
+    prompt += f"- For sections WITH notes: synthesize the notes into professional clinical paragraphs describing progress, challenges, and therapy implications\n"
+    prompt += f"- For sections marked [NO NOTES]: write only '• No documented data for this area'\n"
+    prompt += f"- Compare across sessions when multiple session notes are available (e.g., 'has shown improvement from early sessions where X to recent sessions where Y')\n"
+    prompt += f"- Maintain the tone of the actual notes: if notes are positive, write positively; if notes show difficulty, acknowledge it honestly\n"
+    prompt += f"- Do NOT invent observations not present in the notes\n"
+    prompt += f"- Use bold **section titles** for each of the 5 sections\n"
     prompt += f"\nSTART YOUR RESPONSE WITH: '{therapy_label} – Progress Summary'\n"
     
     return prompt
