@@ -27,6 +27,19 @@ const inputEditStyles = `
     background-color: #f3f4f6;
     color: #6b7280;
   }
+  @keyframes pulsate {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(227, 139, 82, 0.7);
+    }
+    50% {
+      transform: scale(1.05);
+      box-shadow: 0 0 0 8px rgba(227, 139, 82, 0);
+    }
+  }
+  .pulsate-edit {
+    animation: pulsate 1s ease-in-out 3;
+  }
 `;
 
 // Add styles to document head
@@ -567,6 +580,32 @@ const SPECIAL_EDU_ASSESSMENT_PHASES = [
   '4th Qtr',
 ];
 
+// Helper function to determine the highest filled phase for a table
+const getHighestFilledPhase = (table) => {
+  if (!table) return '1st assmt';
+  
+  const quarterOverrides = table.quarterOverrides || {};
+  const phases = ['4th Qtr', '3rd Qtr', '2nd Qtr', '1st Qtr', '1st assmt'];
+  
+  // Check phases from highest to lowest
+  for (const phase of phases) {
+    if (phase === '1st assmt') {
+      // 1st assessment always exists if table has rows
+      if (table.rows && table.rows.length > 0) {
+        return '1st assmt';
+      }
+    } else {
+      // Quarter phases: check if there are any overrides
+      const phaseOverrides = quarterOverrides[phase];
+      if (phaseOverrides && Object.keys(phaseOverrides).length > 0) {
+        return phase;
+      }
+    }
+  }
+  
+  return '1st assmt'; // fallback
+};
+
 const normalizeSectionKey = (label) =>
   String(label || '')
     .toLowerCase()
@@ -607,6 +646,9 @@ const StudentPage = () => {
   const [savedTables, setSavedTables] = useState([]);
   const [ocrMethod, setOcrMethod] = useState(null);
   const [reportDate, setReportDate] = useState('');
+  const [extractionNotification, setExtractionNotification] = useState(null);
+  const [showTableDetails, setShowTableDetails] = useState({});
+  const [tableSavedStatus, setTableSavedStatus] = useState({});
   const [extractionData, setExtractionData] = useState(null);
   const [extractionSummary, setExtractionSummary] = useState(null);
   const fileInputRef = useRef(null);
@@ -663,6 +705,9 @@ const StudentPage = () => {
   
   const [activeSkillByTable, setActiveSkillByTable] = useState({});
   const [questionsOpenByTable, setQuestionsOpenByTable] = useState({});
+  const [activeQuestionByTable, setActiveQuestionByTable] = useState({}); // Track active question index per table
+  const questionRefs = useRef({}); // Refs for scrolling to questions
+  const [pulsatingEditButton, setPulsatingEditButton] = useState({}); // Track which table's edit button should pulsate
 
   const handleAISummarize = async () => {
     setAiSummaryError(null);
@@ -1574,7 +1619,8 @@ useEffect(() => {
         ...t,
         // default: tables from previous sessions are read-only
         isEditable: t.isEditable === true,
-        assessment_phase: t.assessment_phase || '1st assmt',
+        // Set to the highest filled phase instead of just using saved value
+        assessment_phase: getHighestFilledPhase(t),
         last_edited_at: t.last_edited_at || null,
       }));
       setSavedTables(normalized);
@@ -1671,7 +1717,16 @@ useEffect(() => {
           console.warn('Failed to save Special Education tables history', err);
         }
       
-        showToast(`Successfully extracted ${data.tables.length} table(s) using ${data.method}!`, 'success');
+        // Show temporary notification
+        setExtractionNotification({
+          tableCount: data.tables.length,
+          method: data.method || 'Unknown'
+        });
+        
+        // Auto-hide after 4 seconds
+        setTimeout(() => {
+          setExtractionNotification(null);
+        }, 4000);
       } else {
         setOcrError('No tables detected in the image. Please try a different image or adjust the crop area.');
         showToast('No tables detected in the image.', 'warning');
@@ -1693,6 +1748,10 @@ useEffect(() => {
       setOcrError('Please select an image first.');
       return;
     }
+    if (!reportDate) {
+      setOcrError('Please enter the report date.');
+      return;
+    }
     await handleOcrUploadWithFile(ocrImage);
   };
 
@@ -1704,6 +1763,15 @@ useEffect(() => {
     setExtractionData(null);
     setExtractionSummary(null);
     if (fileInputRef.current) fileInputRef.current.value = null;
+  };
+
+  // Helper function to format dates in a human-friendly way (no seconds)
+  const formatDate = (dateString) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + 
+           ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   const handleSetTableEditable = (targetTable, editable) => {
@@ -3931,12 +3999,7 @@ const handleGenerateSummaryReport = () => {
             </div>
           ) : activeTab === "special-education" ? (
             <div className="max-w-6xl mx-auto p-6">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] rounded-2xl shadow-lg p-6 mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Special Education Report </h2>
-                <p className="text-white/90">Upload an image of a student report table to extract data automatically</p>
-                <p className="text-white/70 text-sm mt-2">⚡ Fast A/B detection: ~3-8 seconds</p>
-              </div>
+
 
               {student && (
                 <div className="mt-4 mb-2 bg-white/70 rounded-xl px-4 py-3 border border-[#E38B52]/20">
@@ -4021,21 +4084,38 @@ const handleGenerateSummaryReport = () => {
                         Clear
                       </button>
                     )}
+                    
+                    {/* Extraction Success Notification (Temporary) */}
+                    {extractionNotification && (
+                      <div className="ml-4 bg-green-50 border border-green-200 rounded-lg px-4 py-2 flex items-center gap-2 shadow-md animate-fade-in">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="text-sm">
+                          <p className="font-medium text-green-800">
+                            Successfully extracted {extractionNotification.tableCount} table(s)
+                          </p>
+                          <p className="text-xs text-green-700">
+                            Method used: {extractionNotification.method}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                {/* Error Display */}
-                {ocrError && (
-                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-medium text-red-800">Error</p>
-                      <p className="text-sm text-red-700">{ocrError}</p>
+                  
+                  {/* Error Display */}
+                  {ocrError && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-red-800">Error</p>
+                        <p className="text-sm text-red-700">{ocrError}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Results Section */}
@@ -4071,21 +4151,6 @@ const handleGenerateSummaryReport = () => {
                       </div>
                     </div>
                   )}
-                  
-                  {/* Success Message */}
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-medium text-green-800">
-                        Successfully extracted {savedTables.length} table(s)
-                      </p>
-                      <p className="text-xs text-green-700 mt-1">
-                        Method used: {ocrMethod || 'Unknown'}
-                      </p>
-                    </div>
-                  </div>
 
                   {/* Display Tables (all past + current, collapsible) */}
                   {[...savedTables]
@@ -4101,88 +4166,89 @@ const handleGenerateSummaryReport = () => {
                     >
                       {/* Clickable header row */}
                       <summary className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] px-6 py-4 flex items-center justify-between cursor-pointer list-none">
-                        <div>
-                          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                            <span>Table {tableIndex + 1}</span>
+                        <div className="flex-1">
+                          {/* Primary Info - Always Visible */}
+                          <h3 className="text-lg font-bold text-white">
+                            Table {tableIndex + 1}
                             {table.rows && table.rows.length > 0 && table.rows[0]['Student Name'] && (
-                              <span className="text-sm font-normal">
+                              <span className="text-sm font-normal ml-2">
                                 – {table.rows[0]['Student Name']}
                               </span>
                             )}
                           </h3>
-                          <p className="text-xs text-white/80 mt-1">
-                            Report date: {table.report_date ? table.report_date : 'Not specified'}
-                          </p>
-                          <p className="text-xs text-white/80 mt-1">
-                            Extracted on{' '}
-                            <p className="text-xs text-white/80 mt-1">
-                              Assessment: {table.assessment_phase || '1st assmt'}
-                            </p>
-                            <p className="text-xs text-white/80 mt-1">
-                              Last edited:{' '}
-                              {table.last_edited_at
-                                ? new Date(table.last_edited_at).toLocaleString()
-                                : 'Not edited yet'}
-                            </p>
-                            {table.extracted_at
-                              ? new Date(table.extracted_at).toLocaleString()
-                              : 'Unknown'}
-                          </p>
+                          <div className="text-sm text-white/90 mt-1.5 font-medium">
+                            {table.assessment_phase || '1st Assessment'} • Report Date: {table.report_date || 'Not specified'}
+                          </div>
+                          
+                          {/* Details Toggle */}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowTableDetails(prev => ({
+                                ...prev,
+                                [tableIndex]: !prev[tableIndex]
+                              }));
+                            }}
+                            className="mt-2 text-xs text-white/70 hover:text-white flex items-center gap-1 transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {showTableDetails[tableIndex] ? 'Hide Details' : 'Show Details'}
+                          </button>
+                          
+                          {/* Secondary Info - Collapsible */}
+                          {showTableDetails[tableIndex] && (
+                            <div className="mt-3 pt-3 border-t border-white/20 text-xs text-white/70 space-y-1">
+                              <div>Extracted on: {formatDate(table.extracted_at)}</div>
+                              <div>Last edited: {formatDate(table.last_edited_at) || 'Not edited yet'}</div>
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 ml-auto">
-                          <select
-                            value={table.assessment_phase || '1st assmt'}
-                            onClick={e => e.stopPropagation()}
-                            onChange={e => {
-                              e.stopPropagation();
-                              const phase = e.target.value;
-                              const nowIso = new Date().toISOString();
-                          
-                              setSavedTables(prev => {
-                                const updated = prev.map(t =>
-                                  t === table
-                                    ? { ...t, assessment_phase: phase, last_edited_at: nowIso }
-                                    : t
-                                );
-                                try {
-                                  if (typeof window !== 'undefined' && id) {
-                                    const key = `special-education-tables:${id}`;
-                                    window.localStorage.setItem(key, JSON.stringify(updated));
+                          <div className="relative">
+                            <select
+                              value={table.assessment_phase || '1st assmt'}
+                              onClick={e => e.stopPropagation()}
+                              onChange={e => {
+                                e.stopPropagation();
+                                const phase = e.target.value;
+                                const nowIso = new Date().toISOString();
+                            
+                                setSavedTables(prev => {
+                                  const updated = prev.map(t =>
+                                    t === table
+                                      ? { ...t, assessment_phase: phase, last_edited_at: nowIso }
+                                      : t
+                                  );
+                                  try {
+                                    if (typeof window !== 'undefined' && id) {
+                                      const key = `special-education-tables:${id}`;
+                                      window.localStorage.setItem(key, JSON.stringify(updated));
+                                    }
+                                  } catch (err) {
+                                    console.warn('Failed to persist assessment phase', err);
                                   }
-                                } catch (err) {
-                                  console.warn('Failed to persist assessment phase', err);
-                                }
-                                return updated;
-                              });
-                            }}
-                            className="text-[11px] bg-white/90 text-[#170F49] border border-white/70 rounded-full px-2 py-1 focus:outline-none focus:ring-1 focus:ring-white shadow-sm"
-                          >
-                            {SPECIAL_EDU_ASSESSMENT_PHASES.map(phase => (
-                              <option key={phase} value={phase}>{phase}</option>
-                            ))}
-                          </select>                 
-                          {/* Edit/Save toggle */}
-                          <button
-                            type="button"
-                            onClick={e => {
-                              e.preventDefault();
-                              e.stopPropagation(); // don't toggle the <details> open/close
-                              handleSetTableEditable(table, !table.isEditable);
-                            }}
-                            className={
-                              'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ' +
-                              (table.isEditable
-                                ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
-                                : 'bg-white text-[#E38B52] border-[#E38B52]/40 hover:bg-orange-50')
-                            }
-                          >
-                            {table.isEditable ? 'Save' : 'Edit'}
-                          </button>
+                                  return updated;
+                                });
+                              }}
+                              className="text-xs font-medium bg-white text-gray-700 border-2 border-white/30 rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white hover:bg-white/95 hover:border-white/50 transition-all duration-200 shadow-md cursor-pointer appearance-none"
+                            >
+                              {SPECIAL_EDU_ASSESSMENT_PHASES.map(phase => (
+                                <option key={phase} value={phase}>{phase}</option>
+                              ))}
+                            </select>
+                            <svg
+                              className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-700 pointer-events-none"
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </div>
                         
-                          {/* existing Export button ... */}
-                          {/* existing Delete button ... */}
-                        </div>
-                       <div className="flex items-center gap-3 ml-auto">
                           {/* Export icon */}
                           <button
                             type="button"
@@ -4320,46 +4386,41 @@ const handleGenerateSummaryReport = () => {
                             const updated = prev.map(t => {
                               if (t !== table) return t;
                               const rows = t.rows || [];
-                        
-                              // For non-quarter phases (e.g. 1st assmt), edit the base value directly.
+                              const cellKey = `${skillRowIndex}:${colName}`;
+                              
                               if (!isQuarterPhase) {
+                                // 1st Assessment: edit the base value directly
                                 const newRows = rows.map((row, idx) =>
                                   idx === skillRowIndex ? { ...row, [colName]: newValue } : row
                                 );
                                 return { ...t, rows: newRows, last_edited_at: nowIso };
                               }
-                        
-                              // For quarter phases (1st–4th Qtr): only B can be "promoted" to count as A
-                              // in that specific quarter, without changing the underlying B in the table.
-                              const row = rows[skillRowIndex] || {};
-                              const rawCurrent = row[colName];
-                              const currentVal =
-                                typeof rawCurrent === 'string'
-                                  ? rawCurrent.trim().toUpperCase()
-                                  : '';
-                        
-                              if (currentVal !== 'B') return t; // ignore non‑B cells in quarter phases
-                        
-                              const cellKey = `${skillRowIndex}:${colName}`;
-                              const existing = t.quarterOverrides || {};
-                              const phaseOverrides = existing[phase] || {};
-                        
-                              let newPhaseOverrides = phaseOverrides;
+                              
+                              // Quarter phases: track B→A overrides per quarter
+                              // The base data stays unchanged (B remains B)
+                              const currentRow = rows[skillRowIndex] || {};
+                              const currentBaseVal = typeof currentRow[colName] === 'string' 
+                                ? currentRow[colName].trim().toUpperCase() 
+                                : '';
+                              
+                              if (currentBaseVal !== 'B') return t; // only B cells can be overridden
+                              
+                              const quarterOverrides = t.quarterOverrides || {};
+                              const phaseOverrides = quarterOverrides[phase] || {};
+                              let newPhaseOverrides = { ...phaseOverrides };
+                              
                               if (newValue === 'A') {
-                                // mark this B as "counts as A" for this quarter
-                                newPhaseOverrides = { ...phaseOverrides, [cellKey]: 'A' };
+                                // Mark B as improved (A) for THIS quarter
+                                newPhaseOverrides[cellKey] = 'A';
                               } else if (newValue === 'B') {
-                                // remove the override, back to plain B for this quarter
-                                const { [cellKey]: _removed, ...rest } = phaseOverrides;
-                                newPhaseOverrides = rest;
-                              } else {
-                                return t;
+                                // Remove override for THIS quarter
+                                delete newPhaseOverrides[cellKey];
                               }
-                        
-                              return {
-                                ...t,
-                                quarterOverrides: { ...existing, [phase]: newPhaseOverrides },
-                                last_edited_at: nowIso,
+                              
+                              return { 
+                                ...t, 
+                                quarterOverrides: { ...quarterOverrides, [phase]: newPhaseOverrides },
+                                last_edited_at: nowIso 
                               };
                             });
                         
@@ -4385,18 +4446,69 @@ const handleGenerateSummaryReport = () => {
                                 Questionnaire (A = Yes, B = No)
                               </h4>
                               {activeKey && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setQuestionsOpenByTable(prev => ({
-                                      ...prev,
-                                      [tableKey]: !prev[tableKey],
-                                    }))
-                                  }
-                                  className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-100"
-                                >
-                                  {questionsOpenByTable[tableKey] ? 'Hide questions' : 'Show questions'}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  {/* Edit/Save/Saved Toggle */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      
+                                      if (table.isEditable) {
+                                        // Currently in edit mode, save the changes
+                                        handleSetTableEditable(table, false);
+                                        
+                                        // Show "Saved ✓" status
+                                        setTableSavedStatus(prev => ({
+                                          ...prev,
+                                          [tableIndex]: true
+                                        }));
+                                        
+                                        // Revert to "Edit" after 1 second
+                                        setTimeout(() => {
+                                          setTableSavedStatus(prev => ({
+                                            ...prev,
+                                            [tableIndex]: false
+                                          }));
+                                        }, 1000);
+                                      } else {
+                                        // Enter edit mode
+                                        handleSetTableEditable(table, true);
+                                      }
+                                    }}
+                                    className={
+                                      'px-3 py-1.5 rounded-full text-[10px] font-semibold border transition-all duration-200 shadow-sm ' +
+                                      (tableSavedStatus[tableIndex]
+                                        ? 'bg-green-50 text-green-700 border-green-300'
+                                        : table.isEditable
+                                        ? 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
+                                        : 'bg-[#E38B52] text-white border-[#E38B52] hover:bg-[#C8742F] hover:shadow-md') +
+                                      (pulsatingEditButton[tableKey] ? ' pulsate-edit' : '')
+                                    }
+                                  >
+                                    {tableSavedStatus[tableIndex] ? (
+                                      <span className="flex items-center gap-1">
+                                        Saved
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </span>
+                                    ) : table.isEditable ? 'Save' : 'Edit'}
+                                  </button>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setQuestionsOpenByTable(prev => ({
+                                        ...prev,
+                                        [tableKey]: !prev[tableKey],
+                                      }))
+                                    }
+                                    className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-100"
+                                  >
+                                    {questionsOpenByTable[tableKey] ? 'Hide questions' : 'Show questions'}
+                                  </button>
+                                </div>
                               )}
                             </div>
                             {!canEdit && (
@@ -4420,14 +4532,13 @@ const handleGenerateSummaryReport = () => {
                                   Questions are hidden. Click "Show questions" to view them.
                                 </div>
                               ) : (
-                                <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                                <div className="space-y-1 max-h-64 overflow-y-auto overflow-x-hidden pr-1" id={`questions-container-${tableKey}`}>
                                   {questions
                                     .slice(0, sessionHeaders.length)
                                     .map((questionText, idx) => {
                                       const colName = sessionHeaders[idx];
                                       const phase = table.assessment_phase || '1st assmt';
-                                      const overridesForPhase =
-                                        (table.quarterOverrides && table.quarterOverrides[phase]) || {};
+                                      const quarterOverrides = table.quarterOverrides || {};
                                       const cellKey = `${skillRowIndex}:${colName}`;
                                       
                                       const rawValue = skillRow[colName];
@@ -4435,25 +4546,60 @@ const handleGenerateSummaryReport = () => {
                                         typeof rawValue === 'string'
                                           ? rawValue.trim().toUpperCase()
                                           : '';
-                                      const effectiveVal =
-                                        overridesForPhase[cellKey] === 'A' ? 'A' : baseVal;
+                                      
+                                      // For quarters: check if this cell has been overridden
+                                      // in the current quarter or any previous quarter (cumulative)
+                                      const QUARTER_ORDER = ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'];
+                                      const currentQIdx = QUARTER_ORDER.indexOf(phase);
+                                      let effectiveVal = baseVal;
+                                      if (currentQIdx >= 0) {
+                                        for (let qi = 0; qi <= currentQIdx; qi++) {
+                                          const qPhase = QUARTER_ORDER[qi];
+                                          if (quarterOverrides[qPhase] && quarterOverrides[qPhase][cellKey] === 'A') {
+                                            effectiveVal = 'A';
+                                            break;
+                                          }
+                                        }
+                                      }
                                       
                                       const isYes = effectiveVal === 'A';
                                       const isNo = effectiveVal === 'B';
+                                      const isActiveQuestion = activeQuestionByTable[tableKey] === idx;
                             
                                       return (
                                         <div
                                           key={idx}
-                                          className="flex items-center justify-between text-[11px] bg-gray-50 rounded-lg px-2 py-1 border border-gray-100"
+                                          ref={(el) => {
+                                            if (!questionRefs.current[tableKey]) {
+                                              questionRefs.current[tableKey] = {};
+                                            }
+                                            questionRefs.current[tableKey][idx] = el;
+                                          }}
+                                          className={
+                                            'flex flex-wrap items-center gap-2 text-[11px] rounded-lg px-2 py-1.5 border transition-all duration-200 ' +
+                                            (isActiveQuestion 
+                                              ? 'bg-[#E38B52]/20 border-[#E38B52] shadow-md scale-105' 
+                                              : 'bg-gray-50 border-gray-100')
+                                          }
                                         >
-                                          <span className="mr-2 flex-1">
+                                          <span className="flex-1 min-w-0 break-words">
                                             <span className="font-semibold mr-1">{idx + 1}.</span>
                                             {questionText}
                                           </span>
                                           <div className="flex items-center gap-1 flex-shrink-0">                                            
                                             <span
-                                              role={canEdit ? 'button' : undefined}
-                                              onClick={canEdit ? () => handleToggleCell(colName, 'A') : undefined}
+                                              role="button"
+                                              onClick={() => {
+                                                if (canEdit) {
+                                                  handleToggleCell(colName, 'A');
+                                                } else {
+                                                  // Trigger pulsate animation on edit button
+                                                  setPulsatingEditButton(prev => ({ ...prev, [tableKey]: true }));
+                                                  setTimeout(() => {
+                                                    setPulsatingEditButton(prev => ({ ...prev, [tableKey]: false }));
+                                                  }, 3000);
+                                                }
+                                              }}
                                               className={
                                                 'px-2 py-[1px] rounded-full border text-[10px] ' +
                                                 (canEdit ? 'cursor-pointer ' : 'cursor-not-allowed opacity-60 ') +
@@ -4466,8 +4612,18 @@ const handleGenerateSummaryReport = () => {
                                             </span>
                                             
                                             <span
-                                              role={canEdit ? 'button' : undefined}
-                                              onClick={canEdit ? () => handleToggleCell(colName, 'B') : undefined}
+                                              role="button"
+                                              onClick={() => {
+                                                if (canEdit) {
+                                                  handleToggleCell(colName, 'B');
+                                                } else {
+                                                  // Trigger pulsate animation on edit button
+                                                  setPulsatingEditButton(prev => ({ ...prev, [tableKey]: true }));
+                                                  setTimeout(() => {
+                                                    setPulsatingEditButton(prev => ({ ...prev, [tableKey]: false }));
+                                                  }, 3000);
+                                                }
+                                              }}
                                               className={
                                                 'px-2 py-[1px] rounded-full border text-[10px] ' +
                                                 (canEdit ? 'cursor-pointer ' : 'cursor-not-allowed opacity-60 ') +
@@ -4680,7 +4836,9 @@ const handleGenerateSummaryReport = () => {
                                   const rowSkillKey = normalizedSkill || null;
                                   const isRowSelected = rowSkillKey && activeKey === rowSkillKey;
                                   const phase = table.assessment_phase || '1st assmt';
-                                  const overridesForPhase = (table.quarterOverrides && table.quarterOverrides[phase]) || {};
+                                  const quarterOverrides = table.quarterOverrides || {};
+                                  const QUARTER_ORDER = ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'];
+                                  const currentQIdx = QUARTER_ORDER.indexOf(phase);
                               
                                   // Dynamic A/B counts for THIS row from the session columns
                                   const { aCount, bCount } = (() => {
@@ -4691,11 +4849,21 @@ const handleGenerateSummaryReport = () => {
                                       const baseVal =
                                         typeof raw === 'string' ? raw.trim().toUpperCase() : '';
                                       const cellKey = `${rowIdx}:${colName}`;
-                                      const override = overridesForPhase[cellKey];
+                                      
+                                      // Check cumulative overrides up to current quarter
+                                      let effectiveVal = baseVal;
+                                      if (currentQIdx >= 0) {
+                                        for (let qi = 0; qi <= currentQIdx; qi++) {
+                                          const qPhase = QUARTER_ORDER[qi];
+                                          if (quarterOverrides[qPhase] && quarterOverrides[qPhase][cellKey] === 'A') {
+                                            effectiveVal = 'A';
+                                            break;
+                                          }
+                                        }
+                                      }
                                   
-                                      const v = override || baseVal;
-                                      if (v === 'A') a += 1;
-                                      else if (v === 'B') b += 1;
+                                      if (effectiveVal === 'A') a += 1;
+                                      else if (effectiveVal === 'B') b += 1;
                                     });
                                     return { aCount: a, bCount: b };
                                   })();
@@ -4735,10 +4903,20 @@ const handleGenerateSummaryReport = () => {
                                         const isSessionBaseCell =
                                           !col.group && !col.isSkill && fieldName && sessionHeaders.includes(fieldName);
                                         const cellKey = isSessionBaseCell ? `${rowIdx}:${fieldName}` : null;
-                                        const hasOverrideToA =
-                                          !!(cellKey && overridesForPhase[cellKey] === 'A');
                                         
-                                        
+                                        // Find which quarter this cell was overridden in (if any),
+                                        // looking cumulatively up to the current quarter
+                                        let overrideQuarter = null;
+                                        if (cellKey && currentQIdx >= 0) {
+                                          for (let qi = 0; qi <= currentQIdx; qi++) {
+                                            const qPhase = QUARTER_ORDER[qi];
+                                            if (quarterOverrides[qPhase] && quarterOverrides[qPhase][cellKey] === 'A') {
+                                              overrideQuarter = qPhase;
+                                              break;
+                                            }
+                                          }
+                                        }
+                                        const hasOverrideToA = !!overrideQuarter;
                                         
                                         // For color: just use the actual letter we see (A = blue, B = red)
                                         const isAVisual = !isSummaryCell && cellValue === 'A';
@@ -4747,68 +4925,67 @@ const handleGenerateSummaryReport = () => {
                                         let textClass;
                                         if (isSummaryCell) textClass = 'text-gray-900 ';
                                         else if (isAVisual) textClass = 'text-blue-600 ';
-                                        else if (isBVisual) textClass = 'text-red-600 ';
+                                        else if (isBVisual) textClass = 'text-red-600 '; // B stays red even when overridden
                                         else textClass = 'text-gray-900 ';
 
                                         let cellInner = cellValue;
+                                        // Show B with strikethrough pattern based on WHICH quarter the override was made in
                                         if (
                                           isSessionBaseCell &&
                                           cellValue === 'B' &&
                                           hasOverrideToA &&
                                           !isSummaryCell
                                         ) {
-                                          if (phase === '1st Qtr') {
-                                            // 1st Qtr: 3 soft horizontal lines around the B
+                                          if (overrideQuarter === '1st Qtr') {
+                                            // 1st Qtr override: horizontal lines
                                             cellInner = (
-                                              <span className="relative flex items-center justify-center w-full h-full">
-                                                <span className="relative z-10">{cellValue}</span>
-                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[46%]" />
-                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-1/2 -translate-y-1/2" />
-                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[54%]" />
+                                              <span className="absolute inset-0 flex items-center justify-center">
+                                                <span className="relative z-10 font-semibold">{cellValue}</span>
+                                                <span className="pointer-events-none absolute left-0 right-0 h-[1px] bg-blue-600 top-[30%]" />
+                                                <span className="pointer-events-none absolute left-0 right-0 h-[1px] bg-blue-600 top-1/2 -translate-y-1/2" />
+                                                <span className="pointer-events-none absolute left-0 right-0 h-[1px] bg-blue-600 top-[70%]" />
                                               </span>
                                             );
-                                          } else if (phase === '2nd Qtr') {
-                                            // 2nd Qtr: 3 soft vertical lines around the B
+                                          } else if (overrideQuarter === '2nd Qtr') {
+                                            // 2nd Qtr override: vertical lines
                                             cellInner = (
-                                              <span className="relative flex items-center justify-center w-full h-full">
-                                                <span className="relative z-10">{cellValue}</span>
-                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[46%]" />
-                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-1/2 -translate-x-1/2" />
-                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[54%]" />
+                                              <span className="absolute inset-0 flex items-center justify-center">
+                                                <span className="relative z-10 font-semibold">{cellValue}</span>
+                                                <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-[30%]" />
+                                                <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-1/2 -translate-x-1/2" />
+                                                <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-[70%]" />
                                               </span>
                                             );
-                                          } else if (phase === '3rd Qtr') {
-                                            // 3rd Qtr: compact grid around the B
+                                          } else if (overrideQuarter === '3rd Qtr') {
+                                            // 3rd Qtr override: grid (horizontal + vertical)
                                             cellInner = (
-                                              <span className="relative flex items-center justify-center w-full h-full">
-                                                <span className="relative z-10">{cellValue}</span>
-                                                {/* horizontal */}
-                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[46%]" />
-                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-1/2 -translate-y-1/2" />
-                                                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-[55%] h-px bg-blue-500/80 top-[54%]" />
-                                                {/* vertical */}
-                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[46%]" />
-                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-1/2 -translate-x-1/2" />
-                                                <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-[55%] w-px bg-blue-500/80 left-[54%]" />
+                                              <span className="absolute inset-0 flex items-center justify-center">
+                                                <span className="relative z-10 font-semibold">{cellValue}</span>
+                                                <span className="pointer-events-none absolute left-0 right-0 h-[1px] bg-blue-600 top-[30%]" />
+                                                <span className="pointer-events-none absolute left-0 right-0 h-[1px] bg-blue-600 top-1/2 -translate-y-1/2" />
+                                                <span className="pointer-events-none absolute left-0 right-0 h-[1px] bg-blue-600 top-[70%]" />
+                                                <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-[30%]" />
+                                                <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-1/2 -translate-x-1/2" />
+                                                <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-[70%]" />
                                               </span>
                                             );
-                                          } else if (phase === '4th Qtr') {
-                                            // 4th Qtr: 3 diagonal strokes that cross the B but stay tight
+                                          } else if (overrideQuarter === '4th Qtr') {
+                                            // 4th Qtr override: diagonal lines
                                             cellInner = (
-                                              <span className="relative flex items-center justify-center w-full h-full">
-                                                <span className="relative z-10">{cellValue}</span>
+                                              <span className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                                                <span className="relative z-10 font-semibold">{cellValue}</span>
                                                 <span className="pointer-events-none absolute inset-0">
                                                   <span
-                                                    className="absolute left-[-20%] right-[-20%] top-1/2 h-px bg-blue-500/80"
-                                                    style={{ transform: 'rotate(45deg)' }}
+                                                    className="absolute w-[141%] h-[1px] bg-blue-600 left-1/2 top-[30%] -translate-x-1/2"
+                                                    style={{ transform: 'translateX(-50%) rotate(45deg)', transformOrigin: 'center' }}
                                                   />
                                                   <span
-                                                    className="absolute left-[-20%] right-[-20%] top-[46%] h-px bg-blue-500/80"
-                                                    style={{ transform: 'rotate(45deg)' }}
+                                                    className="absolute w-[141%] h-[1px] bg-blue-600 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                                                    style={{ transform: 'translate(-50%, -50%) rotate(45deg)', transformOrigin: 'center' }}
                                                   />
                                                   <span
-                                                    className="absolute left-[-20%] right-[-20%] top-[54%] h-px bg-blue-500/80"
-                                                    style={{ transform: 'rotate(45deg)' }}
+                                                    className="absolute w-[141%] h-[1px] bg-blue-600 left-1/2 top-[70%] -translate-x-1/2"
+                                                    style={{ transform: 'translateX(-50%) rotate(45deg)', transformOrigin: 'center' }}
                                                   />
                                                 </span>
                                               </span>
@@ -4830,6 +5007,14 @@ const handleGenerateSummaryReport = () => {
                                                 ...prevOpen,
                                                 [tableKey]: !!nextKey,
                                               }));
+                                              
+                                              // Clear active question when toggling skill
+                                              if (!nextKey) {
+                                                setActiveQuestionByTable(prevQ => ({
+                                                  ...prevQ,
+                                                  [tableKey]: undefined,
+                                                }));
+                                              }
                               
                                               return {
                                                 ...prev,
@@ -4842,6 +5027,42 @@ const handleGenerateSummaryReport = () => {
                                             (isRowSelected
                                               ? 'font-semibold text-gray-900 border-l-4 border-[#E38B52]'
                                               : 'hover:bg-orange-50');
+                                        }
+                                        
+                                        // Clicking a session cell (1, 2, 3, etc.) navigates to that question
+                                        if (isSessionBaseCell && rowSkillKey) {
+                                          const questionIdx = sessionHeaders.indexOf(fieldName);
+                                          onClick = () => {
+                                            // First, ensure the skill is selected and questions are open
+                                            setActiveSkillByTable(prev => ({
+                                              ...prev,
+                                              [tableKey]: rowSkillKey,
+                                            }));
+                                            
+                                            setQuestionsOpenByTable(prev => ({
+                                              ...prev,
+                                              [tableKey]: true,
+                                            }));
+                                            
+                                            // Set the active question
+                                            setActiveQuestionByTable(prev => ({
+                                              ...prev,
+                                              [tableKey]: questionIdx,
+                                            }));
+                                            
+                                            // Scroll to the question after a brief delay to ensure rendering
+                                            setTimeout(() => {
+                                              const questionEl = questionRefs.current[tableKey]?.[questionIdx];
+                                              if (questionEl) {
+                                                questionEl.scrollIntoView({ 
+                                                  behavior: 'smooth', 
+                                                  block: 'center' 
+                                                });
+                                              }
+                                            }, 200);
+                                          };
+                                          
+                                          extraClass = ' cursor-pointer hover:bg-[#E38B52]/10 hover:scale-110 transition-all duration-150';
                                         }
                               
                                         return (
@@ -4881,37 +5102,7 @@ const handleGenerateSummaryReport = () => {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">No tables extracted yet</h3>
-                  <p className="text-gray-600 mb-6">Upload an image of a student report table to get started</p>
-                  
-                  <div className="max-w-md mx-auto text-left space-y-3">
-                    <p className="text-sm font-medium text-gray-700">Tips for best results:</p>
-                    <ul className="text-sm text-gray-600 space-y-2">
-                      <li className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-[#E38B52] flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                        </svg>
-                        Use high-resolution images (at least 300 DPI)
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-[#E38B52] flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                        </svg>
-                        Ensure good lighting and contrast
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-[#E38B52] flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                        </svg>
-                        Tables with clear borders work best
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-[#E38B52] flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                        </svg>
-                        Make sure the image is properly oriented
-                      </li>
-                    </ul>
-                  </div>
+                  <p className="text-gray-600">Upload an image of a student report table to get started</p>
                 </div>
               )}
             </div>
