@@ -657,6 +657,60 @@ const StudentPage = () => {
   const [translating, setTranslating] = useState(false);
   const [translatedSummary, setTranslatedSummary] = useState(null);
   
+  // Send Report to Parent state
+  const [sendingReport, setSendingReport] = useState(false);
+  const [sendReportSuccess, setSendReportSuccess] = useState(false);
+  const [sendReportError, setSendReportError] = useState(null);
+  
+  // Handle sending report to parent
+  const handleSendReportToParent = async () => {
+    if (!aiAnalysis || !aiAnalysis.summary) {
+      setSendReportError("Please generate AI analysis first");
+      return;
+    }
+    
+    setSendingReport(true);
+    setSendReportSuccess(false);
+    setSendReportError(null);
+    
+    try {
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+      const token = localStorage.getItem("token");
+      
+      const payload = {
+        student_id: student?.studentId || id,
+        title: "Therapy Progress Report",
+        message: `A new therapy progress report has been shared with you for ${student?.name || 'the student'}.`,
+        report_summary: aiAnalysis.summary,
+        report_from_date: fromDate || null,
+        report_to_date: toDate || null,
+        therapy_type: selectedTherapyType || null,
+      };
+      
+      const response = await fetch(`${baseUrl}/api/v1/notifications/send-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to send report: ${errorText}`);
+      }
+      
+      setSendReportSuccess(true);
+      setTimeout(() => setSendReportSuccess(false), 4000);
+    } catch (error) {
+      console.error('Error sending report to parent:', error);
+      setSendReportError(error.message || 'Failed to send report');
+    } finally {
+      setSendingReport(false);
+    }
+  };
+  
   // Handle translation - always translates to Malayalam
   const handleTranslate = async () => {
     setTranslating(true);
@@ -3057,6 +3111,8 @@ const handleGenerateSummaryReport = () => {
                     })()}
                     
                     {aiSummaryError && (<div className="p-2 mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded">{aiSummaryError}</div>)}
+                    {sendReportSuccess && (<div className="p-2 mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded">✓ Report sent to parent successfully!</div>)}
+                    {sendReportError && (<div className="p-2 mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded">{sendReportError}</div>)}
                     {aiSummarizing && (<div className="text-sm text-gray-600 animate-pulse flex items-center gap-2"><div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>Generating comprehensive AI analysis...</div>)}
                     {aiAnalysis && !aiSummarizing && (
                       <div className="mt-4 space-y-4 animate-fadeIn">
@@ -3084,6 +3140,12 @@ const handleGenerateSummaryReport = () => {
                                     <path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" stroke="#E38B52" strokeWidth="2" fill="none" />
                                   </svg>
                                   {translating ? 'Translating...' : 'Malayalam'}
+                                </button>
+                                <button onClick={handleSendReportToParent} disabled={sendingReport} className="ml-2 px-3 py-2 border-2 border-[#E38B52] text-white text-sm rounded-xl bg-[#E38B52] hover:bg-[#D67A3F] active:scale-95 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold disabled:opacity-50 disabled:cursor-not-allowed" title="Send this report to parent user">
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                  </svg>
+                                  {sendingReport ? 'Sending...' : 'Send to Parent'}
                                 </button>
                               </>
                             )}

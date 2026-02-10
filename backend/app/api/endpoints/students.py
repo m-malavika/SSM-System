@@ -8,6 +8,8 @@ from app.crud.student import student as crud_student
 from app.schemas.student import Student, StudentCreate, StudentUpdate
 from app.db.session import get_db
 from app.utils.pagination import PageParams, Page
+from app.api.deps import get_current_active_user
+from app.models.user import User
 
 router = APIRouter()
 
@@ -82,6 +84,49 @@ def read_students(
 # --------------------------------------------------------------------
 # ▲▲▲ END OF MODIFIED FUNCTION ▲▲▲
 # --------------------------------------------------------------------
+
+
+@router.get("/me")
+def get_my_student_data(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Dict[str, Any]:
+    """
+    Get the current logged-in student's own data (read-only).
+    The username should match the student_id.
+    """
+    # Get student by student_id (which is the username for student users)
+    student = crud_student.get_by_student_id(db, student_id=current_user.username)
+    if not student:
+        raise HTTPException(
+            status_code=404,
+            detail="Student record not found for this user"
+        )
+    
+    # Serialize student data safely
+    student_data = {c.name: getattr(student, c.name) for c in student.__table__.columns}
+    
+    # Convert photo bytes to base64 URL if present
+    if student_data.get('photo'):
+        try:
+            b64_photo = base64.b64encode(student_data['photo']).decode('utf-8')
+            student_data['photo_url'] = f"data:image/jpeg;base64,{b64_photo}"
+        except Exception:
+            student_data['photo_url'] = None
+    else:
+        student_data['photo_url'] = None
+    
+    # Remove raw photo bytes
+    student_data.pop('photo', None)
+    
+    # Strip file_data from documents to keep payload small
+    if student_data.get('documents'):
+        student_data['documents'] = [
+            {k: v for k, v in doc.items() if k != 'file_data'}
+            for doc in student_data['documents']
+        ]
+    
+    return student_data
 
 
 @router.post("/", response_model=Student)

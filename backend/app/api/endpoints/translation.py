@@ -252,39 +252,38 @@ async def translate_text(
             
             text_to_translate = request.text.strip()
             
-            # MAXIMUM SPEED: Merge into larger chunks (fewer translations = faster)
-            # Split by double newlines (paragraphs) to preserve major structure
-            paragraphs = text_to_translate.split('\n\n')
+            # PRESERVE FORMATTING: Split by lines to maintain structure (headings, bullets, etc.)
+            # This is crucial for preserving markdown formatting in therapy reports
+            lines = text_to_translate.split('\n')
             
-            if not paragraphs or (len(paragraphs) == 1 and not paragraphs[0].strip()):
+            if not lines or (len(lines) == 1 and not lines[0].strip()):
                 translated_text = ""
             else:
-                # Filter and prepare paragraphs
-                para_map = []  # (index, content) for non-empty paragraphs
-                for i, para in enumerate(paragraphs):
-                    stripped = para.strip()
+                # Filter and prepare lines (preserve structure)
+                line_map = []  # (index, content) for non-empty lines
+                for i, line in enumerate(lines):
+                    stripped = line.strip()
                     if stripped:
-                        # Replace internal newlines with space to make single chunk
-                        merged = ' '.join(stripped.split('\n'))
-                        para_map.append((i, merged))
+                        # Keep line as-is to preserve formatting
+                        line_map.append((i, stripped))
                 
-                if not para_map:
+                if not line_map:
                     translated_text = ""
                 else:
-                    logger.info(f"Translating {len(para_map)} paragraphs (merged for speed)")
+                    logger.info(f"Translating {len(line_map)} lines (preserving structure)")
                     
                     # FAST batch tokenization using list comprehension
                     all_source_tokens = [
                         tokenizer.convert_ids_to_tokens(
                             tokenizer(content, return_tensors=None, add_special_tokens=True)["input_ids"]
                         )
-                        for _, content in para_map
+                        for _, content in line_map
                     ]
                     
                     # Single optimized batch call
                     results = translator.translate_batch(
                         all_source_tokens,
-                        target_prefix=[[tgt_lang]] * len(para_map),
+                        target_prefix=[[tgt_lang]] * len(line_map),
                         beam_size=1,  # Greedy = fastest
                         max_decoding_length=400,
                         replace_unknowns=True,
@@ -293,7 +292,7 @@ async def translate_text(
                     )
                     
                     # Fast batch decode using list comprehension
-                    translated_paras = [
+                    translated_lines = [
                         tokenizer.decode(
                             tokenizer.convert_tokens_to_ids(
                                 r.hypotheses[0][1:] if r.hypotheses[0] and r.hypotheses[0][0] == tgt_lang else r.hypotheses[0]
@@ -303,12 +302,12 @@ async def translate_text(
                         for r in results
                     ]
                     
-                    # Reconstruct with paragraph structure
-                    result_paras = [''] * len(paragraphs)
-                    for idx, (orig_idx, _) in enumerate(para_map):
-                        result_paras[orig_idx] = translated_paras[idx]
+                    # Reconstruct with original line structure
+                    result_lines = [''] * len(lines)
+                    for idx, (orig_idx, _) in enumerate(line_map):
+                        result_lines[orig_idx] = translated_lines[idx]
                     
-                    translated_text = '\n\n'.join(result_paras)
+                    translated_text = '\n'.join(result_lines)
             
             elapsed = time.time() - start_time
             logger.info(f"CTranslate2 INT8 Translation complete: {len(translated_text)} chars in {elapsed:.2f}s")

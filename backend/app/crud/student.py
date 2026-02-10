@@ -4,8 +4,11 @@ from typing import List, Optional, Dict, Any, Union
 from datetime import date
 
 from app.models.student import Student
+from app.models.user import UserRole
 from app.schemas.student import StudentCreate, StudentUpdate
+from app.schemas.user import UserCreate
 from app.crud.base import CRUDBase
+from app.crud.user import user as crud_user
 from app.utils.date_utils import get_today, generate_id_with_year_prefix
 
 class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
@@ -43,6 +46,7 @@ class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
     def create(self, db: Session, *, obj_in: StudentCreate) -> Student:
         """
         Create a new student with a reliable, unique student_id.
+        Also automatically creates a user account for the student.
         """
         # Find the last student created by looking for the highest primary key 'id'
         last_student = db.query(self.model).order_by(desc(self.model.id)).first()
@@ -68,6 +72,42 @@ class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
+        
+        # Automatically create a user account for the student
+        # Username: student_id, Password: date of birth in DDMMYYYY format
+        if db_obj.dob:
+            password = db_obj.dob.strftime("%d%m%Y")
+        else:
+            # Fallback password if DOB is not provided
+            password = "defaultpassword123"
+        
+        # Use a unique email per student user to avoid duplicate email errors
+        # Always use student_id-based email for the user account
+        email = f"{student_id.lower()}@student.local"
+        
+        # Check if user already exists (in case of re-runs)
+        existing_user = crud_user.get_by_username(db, username=student_id)
+        if not existing_user:
+            # Also check if the email is already taken, and make it unique if needed
+            existing_email_user = crud_user.get_by_email(db, email=email)
+            if existing_email_user:
+                email = f"{student_id.lower()}.{db_obj.id}@student.local"
+            
+            try:
+                user_in = UserCreate(
+                    username=student_id,
+                    email=email,
+                    password=password,
+                    role=UserRole.STUDENT,
+                    is_active=True,
+                    is_superuser=False
+                )
+                crud_user.create(db, obj_in=user_in)
+            except Exception as e:
+                # Log but don't fail student creation if user creation fails
+                import logging
+                logging.error(f"Failed to create user account for student {student_id}: {e}")
+        
         return db_obj
     
     def update(
