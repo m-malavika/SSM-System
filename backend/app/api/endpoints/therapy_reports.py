@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import os
 import json
 import logging
+import re
 from datetime import date
 
 try:
@@ -262,7 +263,7 @@ def _generate_comprehensive_analysis(reports, student, payload):
             messages=[{"role": "user", "content": main_summary_prompt}],
             model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
             max_tokens=2000,  # Large enough for detailed clinical paragraphs per section
-            temperature=0.5   # Balanced: faithful to data but with professional elaboration
+            temperature=0.25  # Low temperature for faithful, data-grounded output
         )
         main_summary = _extract_generated_text(main_result)
         
@@ -349,13 +350,12 @@ def _build_overview_prompt(reports, student):
         prompt += f"Therapy: {report.therapy_type or 'Not specified'}\n"
         prompt += f"Progress Level: {report.progress_level or 'Not rated'}\n"
         if report.progress_notes:
-            prompt += f"Detailed Notes: {report.progress_notes}\n"  # Include full notes for personalization
-        if report.goals_achieved:
-            prompt += f"Specific Goals/Achievements: {report.goals_achieved}\n"  # Include full achievements
-        if hasattr(report, 'challenges_faced') and report.challenges_faced:
-            prompt += f"Challenges: {report.challenges_faced}\n"
+            prompt += f"Detailed Notes: {report.progress_notes}\n"
+        goals_text = _goals_to_readable_text(report.goals_achieved)
+        if goals_text:
+            prompt += f"Goals/Observations: {goals_text}\n"
     
-    prompt += f"\nProvide a personalized overview of {student_name}'s specific therapy progress, mentioning actual achievements, specific skills worked on, and concrete progress made based on the detailed session data above. Focus on what makes {student_name}'s journey unique."
+    prompt += f"\nProvide a factual overview of {student_name}'s therapy progress based ONLY on the session data above. Summarize what the notes say without inventing details not present in the notes."
     return prompt
 
 
@@ -376,15 +376,13 @@ def _build_start_analysis_prompt(start_reports, student):
         prompt += f"Therapy Type: {report.therapy_type or 'Not specified'}\n" 
         prompt += f"Initial Progress Level: {report.progress_level or 'Not rated'}\n"
         
-        # Include full assessment notes for personalization
         if report.progress_notes:
-            prompt += f"Complete Initial Assessment Notes: {report.progress_notes}\n"
-        if report.goals_achieved:
-            prompt += f"Specific Early Goals/Challenges: {report.goals_achieved}\n"
-        if hasattr(report, 'baseline_skills') and report.baseline_skills:
-            prompt += f"Baseline Skills Noted: {report.baseline_skills}\n"
+            prompt += f"Assessment Notes: {report.progress_notes}\n"
+        goals_text = _goals_to_readable_text(report.goals_achieved)
+        if goals_text:
+            prompt += f"Goals/Observations: {goals_text}\n"
     
-    prompt += f"\nBased on these specific early session records, provide a personalized analysis of {student_name}'s unique initial condition, specific baseline abilities mentioned in the notes, and particular starting challenges when therapy began. Reference actual details from the assessment notes."
+    prompt += f"\nBased on these early session records, describe {student_name}'s initial condition and starting challenges. Only reference details that appear in the notes above - do not invent observations."
     return prompt
 
 
@@ -464,20 +462,12 @@ def _build_current_status_context(end_reports, student):
         context += f"  Therapy Type: {report.therapy_type or 'Not specified'}\n"
         context += f"  Progress Level: {report.progress_level or 'Not rated'}\n"
         
-        # Include full progress notes for better personalization
         if report.progress_notes:
-            context += f"  Detailed Progress Notes: {report.progress_notes}\n"
+            context += f"  Progress Notes: {report.progress_notes}\n"
         
-        # Include full achievements for specificity
-        if report.goals_achieved:
-            context += f"  Specific Achievements: {report.goals_achieved}\n"
-        
-        # Include any challenges or additional details
-        if hasattr(report, 'challenges_faced') and report.challenges_faced:
-            context += f"  Challenges Noted: {report.challenges_faced}\n"
-        
-        if hasattr(report, 'next_session_goals') and report.next_session_goals:
-            context += f"  Next Goals: {report.next_session_goals}\n"
+        goals_text = _goals_to_readable_text(report.goals_achieved)
+        if goals_text:
+            context += f"  Observations: {goals_text}\n"
         
         context += "\n"
     
@@ -562,10 +552,11 @@ def _build_end_analysis_prompt(end_reports, student):
         
         if report.progress_notes:
             prompt += f"Current Assessment Notes: {report.progress_notes}\n"
-        if report.goals_achieved:
-            prompt += f"Recent Achievements: {report.goals_achieved}\n"
+        goals_text = _goals_to_readable_text(report.goals_achieved)
+        if goals_text:
+            prompt += f"Recent Observations: {goals_text}\n"
     
-    prompt += f"\nBased on these actual recent session records, analyze {student_name}'s current abilities, recent improvements, and present status."
+    prompt += f"\nBased on these recent session records, describe {student_name}'s current abilities and status. Only describe what the notes actually say - do not invent observations."
     return prompt
 
 
@@ -591,11 +582,10 @@ def _build_recommendations_prompt(reports, metrics, student):
         prompt += f"Therapy Type: {report.therapy_type}\n"
         prompt += f"Progress Level: {report.progress_level}\n"
         if report.progress_notes:
-            prompt += f"Complete Session Notes: {report.progress_notes}\n"  # Full notes for better recommendations
-        if report.goals_achieved:
-            prompt += f"Specific Achievements: {report.goals_achieved}\n"  # Full achievements
-        if hasattr(report, 'challenges_faced') and report.challenges_faced:
-            prompt += f"Challenges Identified: {report.challenges_faced}\n"
+            prompt += f"Session Notes: {report.progress_notes}\n"
+        goals_text = _goals_to_readable_text(report.goals_achieved)
+        if goals_text:
+            prompt += f"Observations: {goals_text}\n"
     
     # Add pattern analysis from all reports
     prompt += "\nOVERALL PATTERN ANALYSIS:\n"
@@ -631,15 +621,12 @@ def _build_main_summary_prompt(reports, student):
         prompt += f"\nSession {i} ({report.report_date}):\n"
         prompt += f"Type: {report.therapy_type or 'N/A'} | Level: {report.progress_level or 'N/A'}\n"
         
-        # Include more complete notes for better analysis
         if report.progress_notes:
-            # Keep more content for better personalization
             notes = report.progress_notes[:300] + "..." if len(report.progress_notes) > 300 else report.progress_notes
-            prompt += f"Detailed Notes: {notes}\n"
-        if report.goals_achieved:
-            # Keep more goals content
-            goals = report.goals_achieved[:200] + "..." if len(report.goals_achieved) > 200 else report.goals_achieved
-            prompt += f"Specific Goals/Achievements: {goals}\n"
+            prompt += f"Notes: {notes}\n"
+        goals_text = _goals_to_readable_text(report.goals_achieved, 300)
+        if goals_text:
+            prompt += f"Goals/Observations: {goals_text}\n"
     
     # Add analysis of patterns and trends
     prompt += "\nKEY PATTERNS TO ANALYZE:\n"
@@ -649,7 +636,7 @@ def _build_main_summary_prompt(reports, student):
     progress_journey = _analyze_progress_journey(reports)
     prompt += f"Progress Journey: {progress_journey}\n"
     
-    prompt += f"\nProvide a comprehensive, personalized summary of {student_name}'s unique therapy journey. Reference specific achievements, challenges, and progress patterns mentioned in the actual session notes. Highlight what makes {student_name}'s progress unique and avoid generic statements. Base the analysis on the specific details provided in the session history above."
+    prompt += f"\nProvide a factual summary of {student_name}'s therapy journey based on the actual session data above. Only reference details explicitly mentioned in the notes."
     return prompt
 
 
@@ -930,6 +917,35 @@ def _generate_fallback_analysis(reports, student, payload, metrics, date_range):
     )
 
 # ============================================================================
+# HELPER: Extract readable notes text from goals_achieved
+# ============================================================================
+
+def _goals_to_readable_text(goals_achieved, max_length=500):
+    """Convert goals_achieved (dict or JSON string) into readable text for prompts.
+    Returns a string like 'Behavioral Management: notes here; Emotional Regulation: notes here'
+    instead of dumping raw dict/JSON."""
+    parsed = _parse_goals_achieved(goals_achieved)
+    if parsed is None:
+        if isinstance(goals_achieved, str) and goals_achieved.strip():
+            return goals_achieved.strip()[:max_length]
+        return ""
+    
+    parts = []
+    for key, value in parsed.items():
+        if isinstance(value, dict):
+            label = value.get('label', key)
+            notes = value.get('notes', '').strip()
+            if notes:
+                parts.append(f"{label}: {notes}")
+        elif isinstance(value, str) and value.strip():
+            parts.append(f"{key}: {value.strip()}")
+    
+    if not parts:
+        return ""
+    return "; ".join(parts)[:max_length]
+
+
+# ============================================================================
 # HELPER: Parse goals_achieved (may be JSON string or dict)
 # ============================================================================
 
@@ -1142,11 +1158,11 @@ NOW ANALYZE THIS STUDENT'S BASELINE:
     for i, report in enumerate(start_reports, 1):
         if report.progress_notes:
             prompt += f"- {report.progress_notes[:200]}\n"
-        if report.goals_achieved:
-            goals_text = str(report.goals_achieved)[:150]
+        goals_text = _goals_to_readable_text(report.goals_achieved, 200)
+        if goals_text:
             prompt += f"  Goals: {goals_text}\n"
     
-    prompt += f"\nDescribe {student_name}'s initial baseline condition based on the early session notes above:\n"
+    prompt += f"\nDescribe {student_name}'s initial baseline condition based on the early session notes above. Only describe what the notes say - do not invent details:\n"
     
     return prompt
 
@@ -1185,11 +1201,11 @@ NOW ANALYZE THIS STUDENT'S CURRENT STATUS:
     for report in end_reports:
         if report.progress_notes:
             prompt += f"- {report.progress_notes[:200]}\n"
-        if report.goals_achieved:
-            goals_text = str(report.goals_achieved)[:150]
-            prompt += f"  Achievements: {goals_text}\n"
+        goals_text = _goals_to_readable_text(report.goals_achieved, 200)
+        if goals_text:
+            prompt += f"  Observations: {goals_text}\n"
     
-    prompt += f"\nDescribe {student_name}'s current abilities and functioning level based on recent sessions:\n"
+    prompt += f"\nDescribe {student_name}'s current abilities and functioning level based on the notes above. Only describe what the notes say - do not invent details:\n"
     
     try:
         messages = [{"role": "user", "content": prompt}]
@@ -1197,7 +1213,7 @@ NOW ANALYZE THIS STUDENT'S CURRENT STATUS:
             messages=messages,
             model=payload.model or "meta-llama/Llama-3.2-3B-Instruct",
             max_tokens=350,
-            temperature=0.7
+            temperature=0.3
         )
         return _extract_generated_text(result)
     except Exception as e:
@@ -1301,51 +1317,193 @@ def _build_main_summary_prompt_with_fewshot(reports, student):
     }
     
     # Get the 5 sections for this therapy type
-    section_titles = therapy_sections.get(therapy_type, therapy_sections["Speech Therapy"])
+    predefined_sections = therapy_sections.get(therapy_type, therapy_sections["Speech Therapy"])
+    
+    # CRITICAL: Build mappings from old/alternate labels AND keys to standard sections
+    # This handles reports saved with getGoalsForTherapyType() (old labels) and key variations
+    label_aliases = {
+        # Behavioral Therapy aliases (getGoalsForTherapyType used different labels)
+        "Behavioral Management": "Behavior Regulation & Self-Control",
+        "Emotional Regulation": "Emotional Regulation Skills",
+        "Social Skills": "Social Behavior & Interaction Skills",
+        "Coping Strategies": "Adaptive Behavior & Functional Skills",
+        # Occupational Therapy aliases
+        "Fine Motor Skills": "Fine Motor Skills",
+        "Gross Motor Skills": "Gross Motor Skills",  
+        "Daily Living Activities": "Activities of Daily Living (ADL)",
+        "Sensory Integration": "Sensory Processing & Integration",
+        # Physical Therapy aliases
+        "Strength & Endurance": "Strength & Endurance",
+        "Flexibility & Range of Motion": "Coordination & Motor Planning",
+        "Balance & Coordination": "Balance & Postural Control",
+        "Mobility & Gait": "Functional Mobility Skills",
+    }
+    
+    # Key-based aliases: map JSON keys to standard section titles
+    key_aliases = {
+        # Behavioral Therapy keys
+        "behavior_regulation": "Behavior Regulation & Self-Control",
+        "behavioral_management": "Behavior Regulation & Self-Control",
+        "attention_compliance": "Attention, Compliance & Task Engagement",
+        "emotional_regulation": "Emotional Regulation Skills",
+        "social_behavior": "Social Behavior & Interaction Skills",
+        "social_skills": "Social Behavior & Interaction Skills",
+        "adaptive_behavior": "Adaptive Behavior & Functional Skills",
+        "coping_strategies": "Adaptive Behavior & Functional Skills",
+    }
+    
+    # First, detect what labels actually exist in the reports
+    actual_labels_in_reports = set()
+    actual_keys_in_reports = set()
+    for report in reports:
+        parsed = _parse_goals_achieved(report.goals_achieved)
+        if isinstance(parsed, dict):
+            for key, value in parsed.items():
+                actual_keys_in_reports.add(key)
+                if isinstance(value, dict):
+                    label = value.get('label', '').strip()
+                    if label:
+                        actual_labels_in_reports.add(label)
+    
+    logging.info(f"="*60)
+    logging.info(f"AI SUMMARY EXTRACTION DEBUG INFO:")
+    logging.info(f"Actual labels in reports: {actual_labels_in_reports}")
+    logging.info(f"Actual keys in reports: {actual_keys_in_reports}")
+    logging.info(f"Predefined sections for {therapy_type}: {predefined_sections}")
+    logging.info(f"="*60)
+    
+    # Build reverse lookup: for each predefined section, which labels/keys should match?
+    section_to_aliases = {}
+    section_to_key_aliases = {}
+    for section in predefined_sections:
+        # Label aliases
+        aliases = {section, section.lower()}
+        for old_label, mapped_section in label_aliases.items():
+            if mapped_section == section:
+                aliases.add(old_label)
+                aliases.add(old_label.lower())
+        section_to_aliases[section] = aliases
+        
+        # Key aliases
+        key_alias_set = set()
+        for key, mapped_section in key_aliases.items():
+            if mapped_section == section:
+                key_alias_set.add(key)
+                key_alias_set.add(key.lower())
+        section_to_key_aliases[section] = key_alias_set
+    
+    # Check if ANY predefined section matches any report label
+    any_match = False
+    for section in predefined_sections:
+        for actual_label in actual_labels_in_reports:
+            if actual_label in section_to_aliases.get(section, set()) or actual_label == section:
+                any_match = True
+                break
+    
+    # If no predefined sections match, use the actual labels from reports instead
+    if not any_match and actual_labels_in_reports:
+        logging.warning(f"No predefined sections matched report labels. Using actual labels from reports.")
+        section_titles = sorted(list(actual_labels_in_reports))
+    else:
+        section_titles = predefined_sections
     
     # Build prompt with therapy-specific context
     therapy_label = therapy_type if therapy_type else "Therapy"
     
-    prompt = f"""You are an experienced clinical therapist writing a detailed professional progress summary report.
+    # Determine if this is a single-session or multi-session summary
+    is_single_session = len(reports) == 1
+    session_count_label = "1 session" if is_single_session else f"{len(reports)} sessions"
+    
+    prompt = f"""You are an objective clinical therapist writing a factual progress summary based STRICTLY on the session notes provided.
 
-Generate a comprehensive {therapy_label} Progress Summary for a student based on their actual therapy session notes.
+Generate a {therapy_label} Progress Summary for a student. You MUST only describe what is stated in the session notes below. Do NOT add, infer, or fabricate any observations, techniques, or details that are not explicitly written in the notes.
 
-FORMAT REQUIREMENTS:
+THIS SUMMARY IS BASED ON: {session_count_label}
+"""
+    
+    if is_single_session:
+        prompt += f"""*** SINGLE-SESSION RULES (CRITICAL — only 1 day of data) ***
+- This is a SINGLE therapy session. There is NO timeline and NO progression.
+- Do NOT use words like: "improved", "showed improvement", "progressed", "increased", "showed growth", "early session", "mid session", "recent session", "across sessions", "over time", "compared to earlier"
+- INSTEAD use words like: "demonstrated", "attempted", "participated in", "practiced", "worked on", "engaged in", "was observed to", "required cues/prompts", "emerging", "with support", "during the session"
+- Describe what was ATTEMPTED or OBSERVED during this single session, not improvement
+- If goals are listed, describe them as targets that were worked on — not as achievements
+"""
+    else:
+        prompt += f"""*** MULTI-SESSION RULES ({len(reports)} sessions) ***
+- You may describe changes across sessions if the notes support it
+- Use comparison language only when notes from different sessions show actual change
+- If notes are similar across sessions, say performance was "consistent" or "stable" — not "improved"
+"""
+    
+    prompt += f"""FORMAT REQUIREMENTS:
 - Title: "{therapy_label} – Progress Summary"
-- Generate EXACTLY 5 sections using bold section headers (** around titles)
-- Each section must have 2-3 detailed bullet points (use • for bullets)
-- Each bullet point must be 2-3 COMPLETE SENTENCES providing clinical analysis
-- For each bullet, describe what the student can do, analyze progress across sessions, and suggest what the therapist should focus on
-- Write in professional clinical language suitable for a therapy report
+- Generate ONLY the sections listed below that have session notes — do NOT generate sections with no data
+- Each section must have 2-3 bullet points (use • for bullets)
+- Each bullet point must be 2-3 COMPLETE SENTENCES
+- Write in professional clinical language
 - NO dates, NO session numbers
 
 WRITING STYLE:
-- Write as a professional therapist synthesizing observations across multiple sessions
-- For each finding, explain the observation, analyze what it means for the student's development, and note implications for continued therapy
-- Use phrases like: "The student has demonstrated...", "This progress is likely due to...", "The therapist should continue to...", "Despite this progress...", "...remains a concern, highlighting the need for..."
-- When notes show improvement across sessions, describe the trajectory of improvement
-- When notes show difficulties, acknowledge them honestly and suggest continued support
-- Be detailed and thorough - each bullet should be a mini-paragraph of 2-3 sentences
+- Be OBJECTIVE and EVIDENCE-BASED: only summarize what the notes actually say
+- If notes describe inconsistent, fluctuating, or uneven progress, say so directly - do NOT reframe it as positive
+- If notes describe struggles, difficulties, or lack of progress, report that honestly
+- If notes describe progress, report that accurately without exaggerating
+- Use hedging language that matches the data: "sometimes", "inconsistently", "on some occasions" when the notes indicate variability
+- NEVER fabricate specific techniques, tools, methods, or observations not mentioned in the notes
+- NEVER add details like "eye contact", "visual aids", "role-playing", "deep breathing" unless the notes explicitly mention them
 
-CRITICAL RULES:
-- Base ALL content on the actual session notes provided below - do NOT invent observations not in the data
-- Preserve the tone: positive notes = positive summary, negative notes = honest about difficulties
-- If a section has notes, synthesize them into detailed clinical paragraphs
-- If a section has NO notes at all (marked [NO NOTES]), write "No documented data for this area" with ONE bullet only
-- Do NOT mix observations and "no data" in the same section
-- Do NOT invert findings (don't turn positive into negative or vice versa)
+**CRITICAL: DO NOT GIVE ADVICE OR RECOMMENDATIONS**
+- DO NOT write: "The therapist should...", "It is recommended...", "Continued support is needed...", "Further work is indicated...", "Additional practice would help..."
+- DO NOT suggest strategies, interventions, or next steps
+- ONLY describe what WAS OBSERVED in the session notes - past tense descriptions only
+- This is a SUMMARY of progress, NOT a recommendation or treatment plan
 
-EXAMPLE (showing desired detail level):
+CRITICAL ANTI-HALLUCINATION RULES:
+- If the notes say "sometimes follows rules but needs reminders" → write about inconsistent rule-following and need for reminders. Do NOT say "significant improvement"
+- If the notes say "progress is uneven" → write about uneven progress. Do NOT say "consistent improvement"
+- If the notes say "struggles when upset" → write about difficulty during emotional distress. Do NOT say "notable progress in emotional regulation"
+- EVERY claim in your summary must be directly traceable to a specific note provided below
+- ONLY generate sections that are listed below — do NOT invent or add sections that are not provided
+- Do NOT invert the tone of the notes (don't turn negative into positive or vice versa)
+
+**SECTION ISOLATION — CRITICAL:**
+- Each section's bullet points must ONLY describe notes listed under THAT section
+- Do NOT move or copy notes from one section into another section
+- If Section A's notes mention "lip closure" and Section B's notes mention "prepositions", do NOT swap them
+- Every sentence must come from the notes of its OWN section
+"""
+    
+    if is_single_session:
+        prompt += f"""
+EXAMPLE — Single-session summary (use THIS style for 1-session summaries):
 
 **Receptive Language Skills (Comprehension)**
-• The student has demonstrated significant improvement in comprehension and understanding, particularly when presented with information at a slower pace. This progress is likely due to increased repetition and targeted exposure during therapy sessions.
-• However, there is still a need for continued repetition and practice to solidify these skills. The therapist should aim to incorporate more varied and complex conversations to challenge the student's comprehension abilities.
-• Overall receptive language skills have shown consistent improvement across sessions, indicating a positive response to the current therapeutic approach.
+• During the session, the student demonstrated understanding of basic prepositions such as in, on, and under with verbal and visual cues. The student followed 3-step related commands in familiar routines with support.
+• Understanding of personal pronouns (he, she, they) was emerging and required prompts during the session.
 
 **Expressive Language Skills**
-• The student has made notable progress in expressing their current feelings and emotions, showcasing an increase in verbal communication. This improvement is likely due to targeted exercises and strategies developed in previous sessions.
-• Despite this progress, the student still faces challenges in certain areas of expression, which may require additional support and modified strategies. The therapist should continue to work on developing these skills through varied activities.
+• The student used 4–5-word utterances to describe actions and express needs when provided with cues. Simple narrative retelling using 3 sequential events was attempted with support and modeling.
 
+**Oral Motor & Oral Placement Therapy (OPT) Goals**
+• The student participated in oral motor activities targeting lip closure, bilabial strength, and jaw stability. Tongue elevation, lateralization, and retraction were practiced with guidance and support.
+"""
+    else:
+        prompt += f"""
+EXAMPLE 1 – Inconsistent/fluctuating progress (use when notes describe mixed results):
+
+**Behavior Regulation & Self-Control**
+• The student followed rules on some days but frequently required reminders to stay on task. Progress in this area was inconsistent, with periods of improvement followed by regression to earlier behavior patterns.
+• Impulsive behavior continued to be observed on certain days. Self-regulation skills were not reliably demonstrated across different contexts and sessions.
+
+EXAMPLE 2 – Genuine progress (use ONLY when notes from different sessions clearly show change):
+
+**Expressive Language Skills**
+• The student showed improvement in using complete sentences to express needs, moving from single-word responses in earlier sessions to short phrases in recent sessions. More complex sentence structures were observed in the most recent sessions.
+• Occasional difficulty with complex syntax remained, but overall expressive output had increased when comparing early and recent sessions.
+"""
+
+    prompt += f"""
 NOW GENERATE FOR THIS STUDENT:
 
 Student Name: {student_name}
@@ -1355,18 +1513,20 @@ Total Sessions: {len(reports)}
 REQUIRED SECTIONS (Use these EXACT titles in this EXACT order, with ** bold markers):
 """
     
-    # List the exact 5 sections
-    for i, title in enumerate(section_titles, 1):
-        prompt += f"{i}. {title}\n"
-    
-    prompt += f"\nSession Notes by Section (Use ONLY this information):\n"
-    
-    # Provide section data
+    # ── PRE-COLLECT notes per section so we know which sections have data ──
+    section_notes_map = {}  # title -> list of notes
     for title in section_titles:
-        prompt += f"\n{title}:\n"
-        
-        # Collect all notes for this section by matching label
         all_notes = []
+        title_lower = title.lower().strip()
+        aliases = section_to_aliases.get(title, {title, title_lower})
+        title_clean = re.sub(r'[^a-z0-9\s]', ' ', title_lower)
+        title_keywords = set(title_clean.split()) - {'and', 'the', 'of', 'for', 'in', 'skills', 'a', ''}
+        
+        logging.info(f"\n--- Searching for section: '{title}' ---")
+        logging.info(f"  Title keywords: {title_keywords}")
+        logging.info(f"  Known aliases: {aliases}")
+        logging.info(f"  Key aliases: {section_to_key_aliases.get(title, set())}")
+        
         for report in reports:
             parsed = _parse_goals_achieved(report.goals_achieved)
             if isinstance(parsed, dict):
@@ -1374,12 +1534,76 @@ REQUIRED SECTIONS (Use these EXACT titles in this EXACT order, with ** bold mark
                 
                 for key, value in parsed.items():
                     if isinstance(value, dict):
-                        label_match = value.get('label') == title
-                        has_notes = value.get('notes') and value['notes'].strip()
-                        logging.info(f"  Key '{key}': label='{value.get('label')}', match={label_match}, has_notes={has_notes}")
+                        label = value.get('label', '').strip()
+                        notes = value.get('notes', '')
+                        has_notes = notes and notes.strip()
                         
-                        if label_match and has_notes:
-                            all_notes.append(value['notes'])
+                        if not has_notes:
+                            continue
+                        
+                        label_match = False
+                        match_reason = None
+                        
+                        key_normalized = key.lower().replace('_', ' ').strip()
+                        key_clean = re.sub(r'[^a-z0-9\\s]', ' ', key_normalized)
+                        key_words = set(key_clean.split()) - {'and', 'the', 'of', 'for', 'in', 'skills', 'a', ''}
+                        
+                        if label == title:
+                            label_match = True
+                            match_reason = "exact label match"
+                        
+                        if not label_match and (label in aliases or label.lower() in aliases):
+                            label_match = True
+                            match_reason = "alias match"
+                        
+                        if not label_match and label and label.lower().strip() == title_lower:
+                            label_match = True
+                            match_reason = "case-insensitive exact match"
+                        
+                        if not label_match:
+                            key_lower = key.lower().strip()
+                            if key_lower in section_to_key_aliases.get(title, set()):
+                                label_match = True
+                                match_reason = "explicit key alias"
+                        
+                        if not label_match and key_words:
+                            matching_words = key_words & title_keywords
+                            if len(matching_words) >= 2:
+                                label_match = True
+                                match_reason = f"keyword match (2+ words): {matching_words}"
+                            elif len(key_words) == 1 and key_words.issubset(title_keywords):
+                                label_match = True
+                                match_reason = f"single keyword match: {key_words}"
+                        
+                        if not label_match:
+                            for alias in aliases:
+                                alias_clean = re.sub(r'[^a-z0-9\s]', ' ', alias.lower())
+                                alias_keywords = set(alias_clean.split()) - {'and', 'the', 'of', 'for', 'in', 'skills', 'a', ''}
+                                if key_words and alias_keywords:
+                                    matching = key_words & alias_keywords
+                                    if len(matching) >= 2 or (len(key_words) == 1 and key_words.issubset(alias_keywords)):
+                                        label_match = True
+                                        match_reason = f"alias keyword match via '{alias}': {matching}"
+                                        break
+                        
+                        if not label_match and label:
+                            label_cleaned = re.sub(r'[^a-z0-9\s]', ' ', label.lower())
+                            title_cleaned = re.sub(r'[^a-z0-9\s]', ' ', title_lower)
+                            label_words = set(label_cleaned.split()) - {'and', 'the', 'of', 'for', 'in', 'skills', 'a', ''}
+                            title_words_full = set(title_cleaned.split()) - {'and', 'the', 'of', 'for', 'in', 'skills', 'a', ''}
+                            if label_words and title_words_full:
+                                overlap = label_words & title_words_full
+                                min_words = min(len(label_words), len(title_words_full))
+                                required_matches = max(2, int(0.8 * min_words))
+                                if len(overlap) >= required_matches:
+                                    label_match = True
+                                    match_reason = f"substring/overlap match ({len(overlap)}/{min_words} words): {overlap}"
+                        
+                        if label_match:
+                            logging.info(f"  ✓ MATCH - Key='{key}', Label='{label}', Reason={match_reason}")
+                            all_notes.append(notes.strip())
+                        else:
+                            logging.debug(f"  ✗ No match - Key='{key}', Label='{label}'")
                     elif isinstance(value, str) and value.strip():
                         if title.lower().replace(' ', '_').startswith(key.lower().replace(' ', '_')[:10]):
                             all_notes.append(value)
@@ -1387,32 +1611,92 @@ REQUIRED SECTIONS (Use these EXACT titles in this EXACT order, with ** bold mark
                 logging.warning(f"Report ID={report.id}: goals_achieved could not be parsed (type={type(report.goals_achieved)})")
         
         logging.info(f"Section '{title}': Found {len(all_notes)} notes")
+        section_notes_map[title] = all_notes
+    
+    # ── Filter to only sections that have notes ──
+    active_sections = [t for t in section_titles if section_notes_map.get(t)]
+    skipped_sections = [t for t in section_titles if not section_notes_map.get(t)]
+    
+    if skipped_sections:
+        logging.info(f"Skipping sections with no data: {skipped_sections}")
+    
+    # List only the active sections in the prompt
+    for i, title in enumerate(active_sections, 1):
+        prompt += f"{i}. {title}\n"
+    
+    prompt += f"\nSession Notes by Section:\n"
+    prompt += f"⚠️ CRITICAL RULE: For EACH section below, use ONLY the notes listed under that section's heading. DO NOT move notes between sections. ⚠️\n"
+    
+    # Provide section data — only sections that have notes
+    for title in active_sections:
+        all_notes = section_notes_map[title]
+        prompt += f"\n━━━ {title} ━━━\n"
+        prompt += f"(Write 2-3 bullets using ONLY the notes below)\n"
         
-        if all_notes:
-            # Show all notes for accurate representation
-            if len(all_notes) >= 3:
-                # Multiple sessions - show early, middle, and recent
-                prompt += f"  Early session: {all_notes[0][:250]}\n"
-                prompt += f"  Mid session: {all_notes[len(all_notes)//2][:250]}\n"
-                prompt += f"  Recent session: {all_notes[-1][:250]}\n"
-            elif len(all_notes) == 2:
-                # Two sessions - show both
-                prompt += f"  Early session: {all_notes[0][:250]}\n"
-                prompt += f"  Recent session: {all_notes[-1][:250]}\n"
-            else:
-                # Single session
-                prompt += f"  Session note: {all_notes[0][:250]}\n"
+        if len(reports) == 1:
+            for idx, note in enumerate(all_notes, 1):
+                prompt += f"  [{idx}] {note[:300]}\n"
+        elif len(all_notes) >= 3:
+            prompt += f"  [1] Session 1: {all_notes[0][:250]}\n"
+            prompt += f"  [2] Mid-point: {all_notes[len(all_notes)//2][:250]}\n"
+            prompt += f"  [3] Latest: {all_notes[-1][:250]}\n"
+        elif len(all_notes) == 2:
+            prompt += f"  [1] First: {all_notes[0][:250]}\n"
+            prompt += f"  [2] Second: {all_notes[-1][:250]}\n"
         else:
-            prompt += f"  [NO NOTES IN ANY REPORT FOR THIS SECTION]\n"
+            prompt += f"  [1] {all_notes[0][:250]}\n"
+    
+    # SAFETY NET: If ALL sections have no notes, include raw progress_notes as general context
+    # This handles cases where goals_achieved labels don't match any section
+    all_sections_empty = True
+    for title in section_titles:
+        # Re-check quickly
+        for report in reports:
+            parsed = _parse_goals_achieved(report.goals_achieved)
+            if isinstance(parsed, dict):
+                for key, value in parsed.items():
+                    if isinstance(value, dict) and value.get('notes', '').strip():
+                        # There ARE notes in the data, they just didn't match sections
+                        all_sections_empty = False
+                        break
+            if not all_sections_empty:
+                break
+        if not all_sections_empty:
+            break
+    
+    if all_sections_empty:
+        # Dump ALL available notes as general context
+        prompt += f"\n--- ADDITIONAL CONTEXT (notes from reports that did not match specific sections) ---\n"
+        for report in reports:
+            if report.progress_notes and report.progress_notes.strip():
+                prompt += f"  Progress notes: {report.progress_notes.strip()[:300]}\n"
+            goals_text = _goals_to_readable_text(report.goals_achieved, 400)
+            if goals_text:
+                prompt += f"  Goal notes: {goals_text}\n"
+        prompt += f"--- END ADDITIONAL CONTEXT ---\n"
+        prompt += f"\nNOTE: The above notes did not match the predefined section titles. Distribute the information across the most relevant sections. Do NOT leave sections marked 'No documented data' if relevant notes exist above.\n"
     
     prompt += f"\nIMPORTANT REMINDERS:\n"
-    prompt += f"- Write 2-3 detailed sentences per bullet point (• symbol), providing clinical analysis\n"
-    prompt += f"- For sections WITH notes: synthesize the notes into professional clinical paragraphs describing progress, challenges, and therapy implications\n"
-    prompt += f"- For sections marked [NO NOTES]: write only '• No documented data for this area'\n"
-    prompt += f"- Compare across sessions when multiple session notes are available (e.g., 'has shown improvement from early sessions where X to recent sessions where Y')\n"
-    prompt += f"- Maintain the tone of the actual notes: if notes are positive, write positively; if notes show difficulty, acknowledge it honestly\n"
-    prompt += f"- Do NOT invent observations not present in the notes\n"
-    prompt += f"- Use bold **section titles** for each of the 5 sections\n"
+    prompt += f"- Write 2-3 sentences per bullet point (• symbol) based ONLY on the session notes above\n"
+    prompt += f"- ONLY generate the {len(active_sections)} sections listed above — do NOT add extra sections or write 'No documented data'\n"
+    prompt += f"- For each section: paraphrase and synthesize the notes faithfully — do NOT add information not in the notes\n"
+    prompt += f"- SECTION ISOLATION: each section's bullets must ONLY use notes from THAT section — never borrow notes from other sections\n"
+    if is_single_session:
+        prompt += f"- SINGLE SESSION: Do NOT use improvement/progression language. Use: 'demonstrated', 'attempted', 'practiced', 'worked on', 'with support', 'emerging', 'during the session'\n"
+        prompt += f"- SINGLE SESSION: Goals listed in notes are targets that were WORKED ON — do not claim they were achieved or improved\n"
+    prompt += f"- If notes describe inconsistent or uneven progress, your summary MUST reflect that - do NOT reframe as improvement\n"
+    prompt += f"- NEVER fabricate specific techniques, tools, or strategies not mentioned in the notes\n"
+    prompt += f"\n**ABSOLUTE BAN ON RECOMMENDATIONS:**\n"
+    prompt += f"- DO NOT write: 'support is needed', 'further work is indicated', 'continued practice', 'therapist should', 'it is recommended', 'would benefit from'\n"
+    
+    prompt += f"\n🔒 FINAL REMINDER - SECTION ISOLATION:\n"
+    prompt += f"Each section is separated by ━━━ dividers above. When writing bullets for 'Behavior Regulation & Self-Control', use ONLY notes under that heading.\n"
+    prompt += f"Do NOT copy notes from 'Emotional Regulation Skills' into 'Behavior Regulation & Self-Control' even if they mention similar topics.\n"
+    prompt += f"If a note appears under Section A's heading, it belongs ONLY in Section A's output - NEVER in Section B, C, D, or E.\n"
+    prompt += f"- ONLY describe what WAS observed or attempted — past tense, descriptive language ONLY\n"
+    prompt += f"- This is a progress SUMMARY (describing what happened), NOT a treatment plan\n"
+    prompt += f"\n- Match the EXACT tone of the notes: uncertain notes = uncertain summary, negative notes = honest summary\n"
+    prompt += f"- Use bold **section titles** for each section\n"
     prompt += f"\nSTART YOUR RESPONSE WITH: '{therapy_label} – Progress Summary'\n"
     
     return prompt

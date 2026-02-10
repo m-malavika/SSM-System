@@ -171,7 +171,7 @@ const TherapistDashboard = () => {
 
   // Update goals when therapy type changes
   useEffect(() => {
-    setGoalsAchieved(getGoalsForTherapyType(therapyType));
+    setGoalsAchieved(getTherapySections(therapyType));
   }, [therapyType]);
 
   useEffect(() => {
