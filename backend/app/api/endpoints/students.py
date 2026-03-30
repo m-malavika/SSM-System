@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional, Any, Dict
@@ -14,7 +14,7 @@ from app.models.user import User
 router = APIRouter()
 
 # --------------------------------------------------------------------
-# ▼▼▼ THIS IS THE FULLY MODIFIED FUNCTION ▼▼▼
+# â–¼â–¼â–¼ THIS IS THE FULLY MODIFIED FUNCTION â–¼â–¼â–¼
 # --------------------------------------------------------------------
 @router.get("/")
 def read_students(
@@ -82,7 +82,7 @@ def read_students(
         "page_size": pagination.page_size
     }
 # --------------------------------------------------------------------
-# ▲▲▲ END OF MODIFIED FUNCTION ▲▲▲
+# â–²â–²â–² END OF MODIFIED FUNCTION â–²â–²â–²
 # --------------------------------------------------------------------
 
 
@@ -197,7 +197,10 @@ async def upload_report_image(
                 "success": True,
                 "message": "No tables detected in the image",
                 "tables": [],
-                "method": result.get("method")
+                "method": result.get("method"),
+                "table_detection": result.get("table_detection"),
+                "extracted_data": result.get("extracted_data"),
+                "extraction_summary": result.get("extraction_summary")
             }
         
         return {
@@ -205,7 +208,10 @@ async def upload_report_image(
             "message": f"Successfully extracted {result['table_count']} table(s)",
             "tables": result["tables"],
             "method": result["method"],
-            "filename": file.filename
+            "filename": file.filename,
+            "table_detection": result.get("table_detection"),
+            "extracted_data": result.get("extracted_data"),
+            "extraction_summary": result.get("extraction_summary")
         }
         
     except HTTPException:
@@ -529,3 +535,6 @@ def delete_student_document(
         "message": "Document deleted successfully",
         "document_name": deleted_doc_name
     }
+
+
+

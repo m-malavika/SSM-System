@@ -698,6 +698,8 @@ const StudentPage = () => {
   const [tableSavedStatus, setTableSavedStatus] = useState({});
   const [extractionData, setExtractionData] = useState(null);
   const [extractionSummary, setExtractionSummary] = useState(null);
+  const [tableDetectionPreview, setTableDetectionPreview] = useState(null);
+  const [selectedTableIndexes, setSelectedTableIndexes] = useState([]);
   const fileInputRef = useRef(null);
 
   // Translation state
@@ -2544,6 +2546,7 @@ const StudentPage = () => {
         setOcrMethod(data.method);
         setExtractionData(data.extracted_data || null);
         setExtractionSummary(data.extraction_summary || null);
+        setTableDetectionPreview(data.table_detection?.debug_visualization || null);
 
         // Persist enriched tables in history
         try {
@@ -2608,6 +2611,7 @@ const StudentPage = () => {
     setOcrMethod(null);
     setExtractionData(null);
     setExtractionSummary(null);
+    setTableDetectionPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = null;
   };
 
@@ -2761,6 +2765,63 @@ const StudentPage = () => {
       const tableToDelete = sorted[viewIndex];
       return prev.filter((t) => t !== tableToDelete);
     });
+
+    setSelectedTableIndexes([]);
+  };
+
+  const handleToggleTableSelection = (viewIndex) => {
+    setSelectedTableIndexes((prev) =>
+      prev.includes(viewIndex)
+        ? prev.filter((idx) => idx !== viewIndex)
+        : [...prev, viewIndex],
+    );
+  };
+
+  const handleDeleteSelectedTables = () => {
+    if (!selectedTableIndexes.length) return;
+
+    const count = selectedTableIndexes.length;
+    const confirmDelete = window.confirm(
+      `Delete ${count} selected table${count > 1 ? "s" : ""}?`,
+    );
+    if (!confirmDelete) return;
+
+    const selectedSet = new Set(selectedTableIndexes);
+
+    setSavedTables((prev) => {
+      const sorted = [...prev].sort((a, b) => {
+        const da = new Date(a.report_date || a.extracted_at || 0);
+        const db = new Date(b.report_date || b.extracted_at || 0);
+        return db - da;
+      });
+
+      const tablesToDelete = sorted.filter((_, idx) => selectedSet.has(idx));
+      const updated = prev.filter((t) => !tablesToDelete.includes(t));
+
+      try {
+        if (typeof window !== "undefined" && id) {
+          const key = `special-education-tables:${id}`;
+          window.localStorage.setItem(key, JSON.stringify(updated));
+        }
+      } catch (err) {
+        console.warn("Failed to persist deleted table list", err);
+      }
+
+      return updated;
+    });
+
+    setExtractedTables((prev) => {
+      const sorted = [...prev].sort((a, b) => {
+        const da = new Date(a.report_date || a.extracted_at || 0);
+        const db = new Date(b.report_date || b.extracted_at || 0);
+        return db - da;
+      });
+
+      const tablesToDelete = sorted.filter((_, idx) => selectedSet.has(idx));
+      return prev.filter((t) => !tablesToDelete.includes(t));
+    });
+
+    setSelectedTableIndexes([]);
   };
 
   const handleExportToCSV = (table, index) => {
@@ -6903,7 +6964,73 @@ const StudentPage = () => {
                     </div>
                   )}
 
+
+                  {tableDetectionPreview && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <h3 className="text-md font-semibold text-amber-900 mb-3">
+                        Table Detection Preview
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white rounded border border-amber-100 p-2">
+                          <p className="text-xs font-medium text-gray-700 mb-2">Detected contour</p>
+                          <img
+                            src={tableDetectionPreview.detected_contour}
+                            alt="Detected table contour"
+                            className="w-full rounded"
+                          />
+                        </div>
+                        <div className="bg-white rounded border border-amber-100 p-2">
+                          <p className="text-xs font-medium text-gray-700 mb-2">Warped table</p>
+                          <img
+                            src={tableDetectionPreview.warped_table}
+                            alt="Warped table"
+                            className="w-full rounded"
+                          />
+                        </div>
+                        <div className="bg-white rounded border border-amber-100 p-2">
+                          <p className="text-xs font-medium text-gray-700 mb-2">Grid overlay</p>
+                          <img
+                            src={tableDetectionPreview.grid_overlay}
+                            alt="Detected table grid overlay"
+                            className="w-full rounded"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* Display Tables (all past + current, collapsible) */}
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E8D4C5] bg-[#FFF9F4] px-4 py-3">
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-[#5A3B28]">
+                      <input
+                        type="checkbox"
+                        checked={savedTables.length > 0 && selectedTableIndexes.length === savedTables.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTableIndexes(savedTables.map((_, idx) => idx));
+                          } else {
+                            setSelectedTableIndexes([]);
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-[#E38B52] focus:ring-[#E38B52]"
+                      />
+                      Select all tables
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-700">
+                        {selectedTableIndexes.length} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleDeleteSelectedTables}
+                        disabled={selectedTableIndexes.length === 0}
+                        className={selectedTableIndexes.length === 0 ? "rounded-lg px-4 py-2 text-sm font-semibold bg-gray-200 text-gray-500 cursor-not-allowed" : "rounded-lg px-4 py-2 text-sm font-semibold bg-red-500 text-white hover:bg-red-600"}
+                      >
+                        Delete Selected
+                      </button>
+                    </div>
+                  </div>
+
                   {[...savedTables]
                     .sort((a, b) => {
                       const da = new Date(a.report_date || a.extracted_at || 0);
@@ -6982,6 +7109,21 @@ const StudentPage = () => {
                             )}
                           </div>
                           <div className="flex items-center gap-3 ml-auto">
+                            <label
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/95 shadow-md"
+                              title="Select table"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedTableIndexes.includes(tableIndex)}
+                                onChange={() => handleToggleTableSelection(tableIndex)}
+                                className="h-4 w-4 rounded border-gray-300 text-[#E38B52] focus:ring-[#E38B52]"
+                              />
+                            </label>
                             <div className="relative">
                               <span className="text-[11px] bg-gray-100 text-gray-600 rounded-full px-2 py-1">
                                 {table.assessment_phase || "1st assmt"}
@@ -10743,3 +10885,10 @@ const StudentPage = () => {
 };
 
 export default StudentPage;
+
+
+
+
+
+
+
