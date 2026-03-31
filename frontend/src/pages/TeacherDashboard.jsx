@@ -100,7 +100,7 @@ const TeacherDashboard = () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-        const { data } = await axios.get("http://localhost:8000/api/v1/users/me", {
+        const { data } = await axios.get("https://ssm-system-bveh.onrender.com/api/v1/users/me", {
           headers: { Authorization: `Bearer ${token}` },
         });
         // Prefer username, fallback to email local-part
@@ -129,7 +129,7 @@ const TeacherDashboard = () => {
         if (studentSearch && studentSearch.trim()) params.search = studentSearch.trim();
         if (selectedClass && selectedClass !== "all") params.class_name = selectedClass;
 
-        const { data } = await axios.get("http://localhost:8000/api/v1/students/", { params });
+        const { data } = await axios.get("https://ssm-system-bveh.onrender.com/api/v1/students/", { params });
         const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
         
         // Normalize photo key: accept either photo_url (snake_case) or photoUrl (camelCase)
@@ -193,7 +193,7 @@ const TeacherDashboard = () => {
 
     try {
       setIsChangingPassword(true);
-      await axios.post("http://localhost:8000/api/v1/auth/change-password", {
+      await axios.post("https://ssm-system-bveh.onrender.com/api/v1/auth/change-password", {
         current_password: currentPassword,
         new_password: newPassword,
       }, {
@@ -660,7 +660,7 @@ const TeacherDashboard = () => {
                   console.log("Sending payload:", payload);
 
                   // POST to backend with authentication
-                  const response = await axios.post("http://localhost:8000/api/v1/therapy-reports/", payload, {
+                  const response = await axios.post("https://ssm-system-bveh.onrender.com/api/v1/therapy-reports/", payload, {
                     headers: { 
                       Authorization: `Bearer ${token}`,
                       "Content-Type": "application/json"

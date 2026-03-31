@@ -63,7 +63,7 @@ const AddUser = () => {
       }
 
       const response = await axios.post(
-        "http://localhost:8000/api/v1/users/teachers",
+        "https://ssm-system-bveh.onrender.com/api/v1/users/teachers",
         payload,
         {
           headers: {

@@ -74,7 +74,7 @@ const AddTherapist = () => {
       };
 
       // Create therapist
-      await axios.post('http://localhost:8000/api/v1/therapists/', finalData);
+      await axios.post('https://ssm-system-bveh.onrender.com/api/v1/therapists/', finalData);
 
       // Generate default password: Therapist + last 4 digits of Aadhaar or random
       const lastFourAadhaar = cleanedAadhaar ? cleanedAadhaar.slice(-4) : Math.floor(Math.random() * 10000).toString().padStart(4, '0');
@@ -83,7 +83,7 @@ const AddTherapist = () => {
       // Create user account
       try {
         const token = localStorage.getItem('token');
-        await axios.post('http://localhost:8000/api/v1/users/', {
+        await axios.post('https://ssm-system-bveh.onrender.com/api/v1/users/', {
           username: therapistData.email.split('@')[0],
           email: therapistData.email,
           password: generatedPassword,

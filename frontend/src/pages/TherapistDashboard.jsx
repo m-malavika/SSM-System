@@ -197,7 +197,7 @@ const TherapistDashboard = () => {
         const token = localStorage.getItem("token");
         if (!token) return;
         const { data } = await axios.get(
-          "http://localhost:8000/api/v1/users/me",
+          "https://ssm-system-bveh.onrender.com/api/v1/users/me",
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -228,7 +228,7 @@ const TherapistDashboard = () => {
           params.class_name = selectedClass;
 
         const { data } = await axios.get(
-          "http://localhost:8000/api/v1/students/",
+          "https://ssm-system-bveh.onrender.com/api/v1/students/",
           { params }
         );
         const items = Array.isArray(data?.items)
@@ -293,7 +293,7 @@ const TherapistDashboard = () => {
     try {
       setIsChangingPassword(true);
       await axios.post(
-        "http://localhost:8000/api/v1/auth/change-password",
+        "https://ssm-system-bveh.onrender.com/api/v1/auth/change-password",
         {
           current_password: currentPassword,
           new_password: newPassword,
@@ -797,7 +797,7 @@ const TherapistDashboard = () => {
                   };
 
                   const response = await axios.post(
-                    "http://localhost:8000/api/v1/therapy-reports/",
+                    "https://ssm-system-bveh.onrender.com/api/v1/therapy-reports/",
                     payload,
                     {
                       headers: {

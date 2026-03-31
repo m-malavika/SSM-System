@@ -16,7 +16,7 @@ if len(sys.argv) < 2:
 student_id = sys.argv[1]
 
 # Test endpoint (no auth required)
-url = "http://localhost:8000/api/v1/therapy-reports/summary/ai/test"
+url = "https://ssm-system-bveh.onrender.com/api/v1/therapy-reports/summary/ai/test"
 
 payload = {
     "student_id": student_id,

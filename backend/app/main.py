@@ -25,9 +25,19 @@ app = FastAPI(
 
 # Configure CORS
 origins = [
-    "http://localhost:3000",  # React frontend
-    "http://localhost:5173",  # Vite frontend (if using Vite)
+    "http://localhost:3000",  # CRA frontend
+    "http://localhost:5173",  # Vite frontend
 ]
+
+# Allow deployed frontend URLs via environment variables.
+# Example: FRONTEND_URL=https://your-frontend.onrender.com
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    origins.append(frontend_url)
+
+frontend_urls = os.getenv("FRONTEND_URLS")
+if frontend_urls:
+    origins.extend([url.strip() for url in frontend_urls.split(",") if url.strip()])
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,3 +59,4 @@ async def root():
         "docs": "/docs",  # Swagger UI
         "redoc": "/redoc"  # ReDoc UI
     }
+

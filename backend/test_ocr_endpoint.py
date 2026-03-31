@@ -5,7 +5,7 @@ import requests
 import json
 
 # API endpoint
-API_URL = "http://localhost:8000/api/v1/students/upload-report"
+API_URL = "https://ssm-system-bveh.onrender.com/api/v1/students/upload-report"
 
 # Path to your test image
 IMAGE_PATH = "path/to/your/report_image.jpg"  # Update this path

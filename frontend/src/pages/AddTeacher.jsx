@@ -90,7 +90,7 @@ const AddTeacher = () => {
       };
 
       // Create teacher
-      const teacherResponse = await axios.post('http://localhost:8000/api/v1/teachers/', teacherDataWithAssignments);
+      const teacherResponse = await axios.post('https://ssm-system-bveh.onrender.com/api/v1/teachers/', teacherDataWithAssignments);
       const teacherId = teacherResponse.data.id;
 
       // Generate default password: Teacher + last 4 digits of Aadhaar or random
@@ -100,7 +100,7 @@ const AddTeacher = () => {
       // Create user account
       try {
         const token = localStorage.getItem('token');
-        await axios.post('http://localhost:8000/api/v1/users/', {
+        await axios.post('https://ssm-system-bveh.onrender.com/api/v1/users/', {
           username: teacherData.email.split('@')[0],
           email: teacherData.email,
           password: generatedPassword,

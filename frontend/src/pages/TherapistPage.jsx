@@ -21,7 +21,7 @@ const TherapistPage = () => {
   useEffect(() => {
     const fetchTherapist = async () => {
       try {
-        const response = await axios.get(`http://localhost:8000/api/v1/therapists/${id}`);
+        const response = await axios.get(`https://ssm-system-bveh.onrender.com/api/v1/therapists/${id}`);
         
         setTherapist({
           name: response.data.name,
@@ -102,7 +102,7 @@ const TherapistPage = () => {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const resp = await axios.post(
-        `http://localhost:8000/api/v1/therapists/${id}/photo`,
+        `https://ssm-system-bveh.onrender.com/api/v1/therapists/${id}/photo`,
         formData,
         {
           headers,
@@ -181,7 +181,7 @@ const TherapistPage = () => {
         rci_renewal_date: editFormData.rci_renewal_date,
       };
 
-      const response = await axios.put(`http://localhost:8000/api/v1/therapists/${id}`, payload);
+      const response = await axios.put(`https://ssm-system-bveh.onrender.com/api/v1/therapists/${id}`, payload);
       
       if (response.status === 200) {
         setTherapist(prev => ({

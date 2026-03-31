@@ -21,7 +21,7 @@ const TeacherPage = () => {
   useEffect(() => {
     const fetchTeacher = async () => {
       try {
-        const response = await axios.get(`http://localhost:8000/api/v1/teachers/${id}`);
+        const response = await axios.get(`https://ssm-system-bveh.onrender.com/api/v1/teachers/${id}`);
         
         // Map API response to the format expected by the UI
         const classAssignments = response.data.class_assignments || [];
@@ -112,7 +112,7 @@ const TeacherPage = () => {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const resp = await axios.post(
-        `http://localhost:8000/api/v1/teachers/${id}/photo`,
+        `https://ssm-system-bveh.onrender.com/api/v1/teachers/${id}/photo`,
         formData,
         {
           headers,
@@ -195,7 +195,7 @@ const TeacherPage = () => {
         rci_renewal_date: editFormData.rci_renewal_date,
       };
 
-      const response = await axios.put(`http://localhost:8000/api/v1/teachers/${id}`, payload);
+      const response = await axios.put(`https://ssm-system-bveh.onrender.com/api/v1/teachers/${id}`, payload);
       
       if (response.status === 200) {
         // Update the local teacher state with new data

@@ -171,7 +171,7 @@ python test_enhanced_ocr.py path/to/assessment_form.jpg
 ### API Endpoint
 
 ```bash
-POST http://localhost:8000/api/ocr/extract
+POST https://ssm-system-bveh.onrender.com/api/ocr/extract
 Content-Type: multipart/form-data
 
 file: <assessment_form_image>

@@ -21,7 +21,7 @@ const LoginPage = () => {
       formData.append("username", username);
       formData.append("password", password);
 
-      const response = await axios.post("http://localhost:8000/api/v1/auth/login", formData);
+      const response = await axios.post("https://ssm-system-bveh.onrender.com/api/v1/auth/login", formData);
 
       if (response.data.access_token) {
         // Store the token in localStorage

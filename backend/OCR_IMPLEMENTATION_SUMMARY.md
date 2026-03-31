@@ -163,7 +163,7 @@ if result['success']:
 
 ### API Endpoint:
 ```bash
-curl -X POST "http://localhost:8000/api/ocr/extract" \
+curl -X POST "https://ssm-system-bveh.onrender.com/api/ocr/extract" \
   -F "file=@assessment_form.jpg"
 ```
 
