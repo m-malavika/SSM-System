@@ -7,10 +7,11 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_FILE = BACKEND_DIR / ".env"
 
+
 class Settings(BaseSettings):
     # Database settings
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
+    POSTGRES_USER: Optional[str] = None
+    POSTGRES_PASSWORD: Optional[str] = None
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: str = "5432"
     POSTGRES_DB: str = "school_management"
@@ -24,24 +25,32 @@ class Settings(BaseSettings):
     # API settings
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Special School Management System"
-    
+
     # Hugging Face settings
     HUGGINGFACE_API_TOKEN: Optional[str] = None
 
     class Config:
         env_file = str(ENV_FILE)
-        env_file_encoding = 'utf-8'
-        extra = 'ignore'
+        env_file_encoding = "utf-8"
+        extra = "ignore"
 
     def get_database_url(self) -> str:
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+        if not self.POSTGRES_USER or not self.POSTGRES_PASSWORD:
+            raise ValueError("Set DATABASE_URL or both POSTGRES_USER and POSTGRES_PASSWORD.")
+
+        return (
+            f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@"
+            f"{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
+
 
 settings = Settings()
 
 # Debug: Print token status on import
 if settings.HUGGINGFACE_API_TOKEN:
-    print(f"✓ HUGGINGFACE_API_TOKEN loaded successfully (starts with: {settings.HUGGINGFACE_API_TOKEN[:10]}...)")
+    print(f"Loaded HUGGINGFACE_API_TOKEN (starts with: {settings.HUGGINGFACE_API_TOKEN[:10]}...)")
 else:
-    print("✗ WARNING: HUGGINGFACE_API_TOKEN not loaded! AI summarization will fail.") 
+    print("WARNING: HUGGINGFACE_API_TOKEN not loaded; AI summarization may fail.")
