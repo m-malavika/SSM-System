@@ -15,6 +15,7 @@ const StudentViewPage = () => {
   const [expandedReports, setExpandedReports] = useState({});
   const [translatedReports, setTranslatedReports] = useState({});
   const [translatingReports, setTranslatingReports] = useState({});
+  const [showTranslatedReports, setShowTranslatedReports] = useState({});
 
   useEffect(() => {
     fetchStudentData();
@@ -65,6 +66,14 @@ const StudentViewPage = () => {
       return;
     }
 
+    if (translatedReports[reportId]) {
+      setShowTranslatedReports(prev => ({
+        ...prev,
+        [reportId]: true
+      }));
+      return;
+    }
+
     try {
       setTranslatingReports(prev => ({ ...prev, [reportId]: true }));
 
@@ -98,6 +107,10 @@ const StudentViewPage = () => {
       setTranslatedReports(prev => ({
         ...prev,
         [reportId]: data.translated_text
+      }));
+      setShowTranslatedReports(prev => ({
+        ...prev,
+        [reportId]: true
       }));
     } catch (e) {
       alert(`Translation failed: ${e.message}`);
@@ -203,6 +216,149 @@ const StudentViewPage = () => {
     localStorage.removeItem("token");
     delete axios.defaults.headers.common["Authorization"];
     navigate("/login");
+  };
+
+  const renderStructuredSummary = (summaryText) => {
+    const text = String(summaryText || "").trim();
+
+    if (!text) {
+      return null;
+    }
+
+    const lines = text.split("\n");
+    const sections = [];
+    let summaryTitle = "Progress Summary";
+    let currentSection = { heading: "Summary", lines: [] };
+
+    const pushSection = () => {
+      const hasContent = currentSection.lines.some((line) => (line || "").trim().length > 0);
+      if (hasContent) {
+        sections.push(currentSection);
+      }
+    };
+
+    lines.forEach((rawLine) => {
+      const line = (rawLine || "").trim();
+
+      if (!line) {
+        currentSection.lines.push("");
+        return;
+      }
+
+      const markdownHeadingMatch = line.match(/^#{1,6}\s+(.+)$/);
+      const isListBulletLine = /^[-*•]\s+/.test(line);
+      const cleanedHeading = line
+        .replace(/^\*+\s*/, "")
+        .replace(/\s*\*+$/, "")
+        .trim();
+      const headingBase = (markdownHeadingMatch?.[1] || cleanedHeading).trim();
+      const isMainTitle = /progress summary/i.test(cleanedHeading);
+      const isBoldHeading = line.startsWith("**") && line.endsWith("**");
+      const isMarkdownHeading = Boolean(markdownHeadingMatch);
+      const isNumberedHeading = /^(\d+[\).\-\s]+|[IVXLCM]+\.\s+)/i.test(headingBase);
+      const isAsteriskMarkedHeading =
+        !isListBulletLine &&
+        /\*+$/.test(line.trim()) &&
+        headingBase.length >= 2;
+      const hasHeadingColon = /[:：]$/.test(headingBase);
+      const headingWords = headingBase.replace(/[:：]$/, "").trim().split(/\s+/).filter(Boolean).length;
+      const isLikelyLocalizedHeading =
+        hasHeadingColon &&
+        headingBase.length >= 2 &&
+        headingBase.length <= 100 &&
+        headingWords <= 14 &&
+        !isListBulletLine;
+      const isSectionHeading =
+        (isBoldHeading || isMarkdownHeading || isAsteriskMarkedHeading || isLikelyLocalizedHeading || (isNumberedHeading && hasHeadingColon)) &&
+        !isMainTitle;
+
+      if (isMainTitle) {
+        const titleWithoutSuffix = cleanedHeading
+          .replace(/\s*[–-]\s*progress summary\s*$/i, "")
+          .replace(/\s*progress summary\s*$/i, "")
+          .trim();
+        summaryTitle = titleWithoutSuffix || summaryTitle;
+        return;
+      }
+
+      if (isSectionHeading) {
+        pushSection();
+        const normalizedHeading = headingBase
+          .replace(/^(\d+[\).\-\s]+|[IVXLCM]+\.\s+)/i, "")
+          .replace(/\*+$/, "")
+          .replace(/[:：]$/, "")
+          .trim();
+        currentSection = {
+          heading: normalizedHeading || "Summary",
+          lines: [],
+        };
+        return;
+      }
+
+      currentSection.lines.push(line);
+    });
+
+    pushSection();
+
+    return (
+      <div className="space-y-3">
+        <div className="mb-2 rounded-xl border border-[#E38B52]/40 bg-gradient-to-r from-orange-100 to-orange-50 px-4 py-3">
+          <div className="text-base sm:text-lg font-extrabold text-[#B85D2A] tracking-wide uppercase">
+            {summaryTitle}
+          </div>
+        </div>
+
+        {sections.map((section, sectionIndex) => {
+          const sectionKey = `${section.heading.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${sectionIndex}`;
+
+          return (
+            <div key={sectionKey} className="rounded-xl border border-orange-200/70 bg-white/90">
+              <div className="px-4 py-3 border-b border-orange-100">
+                <h5 className="text-sm sm:text-base font-bold text-[#B65E2A]">{section.heading}</h5>
+              </div>
+
+              <div className="px-4 py-3 space-y-2">
+                {section.lines.map((line, lineIndex) => {
+                  if (!line.trim()) {
+                    return <div key={`${sectionKey}-blank-${lineIndex}`} className="h-1" />;
+                  }
+
+                  const isBullet = /^[-*•]\s+/.test(line);
+                  const content = isBullet ? line.replace(/^[-*•]\s+/, "").trim() : line;
+                  const isInlineHeading =
+                    !isBullet &&
+                    /^.{2,100}([:：]|\*+)$/.test(content) &&
+                    content.split(/\s+/).length <= 14;
+
+                  if (isInlineHeading) {
+                    return (
+                      <p key={`${sectionKey}-${lineIndex}`} className="text-sm font-bold text-[#B65E2A] leading-relaxed">
+                        {content.replace(/\*+$/, "").replace(/[:：]$/, "").trim()}
+                      </p>
+                    );
+                  }
+
+                  if (isBullet) {
+                    return (
+                      <div key={`${sectionKey}-${lineIndex}`} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#E38B52] shrink-0" />
+                        <p className="leading-relaxed">{content}</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <p key={`${sectionKey}-${lineIndex}`} className="text-sm text-gray-700 leading-relaxed">
+                      {content}
+                    </p>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (loading) {
@@ -1398,21 +1554,20 @@ const StudentViewPage = () => {
                             <div className="mt-2 p-4 bg-white rounded-xl border border-[#E38B52]/10">
                               <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
                                 <span className="text-xs font-semibold text-gray-600 uppercase">
-                                  {translatedReports[notification.id] ? 'Malayalam Translation' : 'English Summary'}
+                                  {showTranslatedReports[notification.id] && translatedReports[notification.id] ? 'Malayalam Translation' : 'English Summary'}
                                 </span>
                                 <div className="flex gap-2">
                                   {translatedReports[notification.id] && (
                                     <button
                                       onClick={() => {
-                                        setTranslatedReports(prev => {
-                                          const newState = { ...prev };
-                                          delete newState[notification.id];
-                                          return newState;
-                                        });
+                                        setShowTranslatedReports(prev => ({
+                                          ...prev,
+                                          [notification.id]: !prev[notification.id]
+                                        }));
                                       }}
                                       className="text-xs text-gray-500 hover:text-[#E38B52] underline transition-colors"
                                     >
-                                      Show Original
+                                      {showTranslatedReports[notification.id] ? 'Show Original' : 'Show Malayalam'}
                                     </button>
                                   )}
                                   <button
@@ -1433,24 +1588,24 @@ const StudentViewPage = () => {
                                           <path d="M2 12h20" stroke="currentColor" strokeWidth="2" />
                                           <path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" stroke="currentColor" strokeWidth="2" fill="none" />
                                         </svg>
-                                        <span>മലയാളം</span>
+                                        <span>{translatedReports[notification.id] ? 'Malayalam Ready' : 'മലയാളം'}</span>
                                       </>
                                     )}
                                   </button>
                                 </div>
                               </div>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                              <div className="text-sm text-gray-700 leading-relaxed">
                                 {translatingReports[notification.id] ? (
                                   <div className="flex items-center gap-2 text-gray-500 py-4">
                                     <div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>
                                     Translating to Malayalam...
                                   </div>
-                                ) : translatedReports[notification.id] ? (
+                                ) : showTranslatedReports[notification.id] && translatedReports[notification.id] ? (
                                   <div className="text-base" style={{ fontFamily: 'system-ui, sans-serif', lineHeight: '1.8' }}>
-                                    {translatedReports[notification.id]}
+                                    {renderStructuredSummary(translatedReports[notification.id])}
                                   </div>
                                 ) : (
-                                  notification.report_summary
+                                  renderStructuredSummary(notification.report_summary)
                                 )}
                               </div>
                             </div>

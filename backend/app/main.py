@@ -6,7 +6,7 @@ import os
 # Load environment variables from .env file
 load_dotenv()
 
-from backend.app.api.api import api_router
+from app.api.api import api_router
 from app.core.config import settings
 
 app = FastAPI(
