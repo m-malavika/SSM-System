@@ -6,7 +6,7 @@ import requests
 
 def test_admin_login():
     try:
-        response = requests.post("http://localhost:8000/api/v1/auth/login", 
+        response = requests.post("https://ssm-system-bveh.onrender.com/api/v1/auth/login", 
                                data={"username": "admin", "password": "admin123"})
         if response.status_code == 200:
             data = response.json()
@@ -27,7 +27,7 @@ def test_admin_login():
                 }
                 
                 headers = {"Authorization": f"Bearer {token}"}
-                test_response = requests.post("http://localhost:8000/api/v1/therapy-reports/", 
+                test_response = requests.post("https://ssm-system-bveh.onrender.com/api/v1/therapy-reports/", 
                                             json=test_payload, headers=headers)
                 print(f"\nTest therapy report creation: {test_response.status_code}")
                 if test_response.status_code == 200:

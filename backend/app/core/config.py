@@ -8,6 +8,7 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_FILE = BACKEND_DIR / ".env"
 
+
 class Settings(BaseSettings):
     # Database settings
     POSTGRES_USER: Optional[str] = None
@@ -31,7 +32,7 @@ class Settings(BaseSettings):
     # API settings
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Special School Management System"
-    
+
     # Hugging Face settings
     HUGGINGFACE_API_TOKEN: Optional[str] = None
     # Hugging Face Inference endpoint.
@@ -40,8 +41,8 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = str(ENV_FILE)
-        env_file_encoding = 'utf-8'
-        extra = 'ignore'
+        env_file_encoding = "utf-8"
+        extra = "ignore"
 
     @model_validator(mode="after")
     def _validate_db_settings(self):

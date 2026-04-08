@@ -68,8 +68,8 @@ The API will be available at http://localhost:8000
 
 ## API Documentation
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: https://ssm-system-bveh.onrender.com/docs
+- ReDoc: https://ssm-system-bveh.onrender.com/redoc
 
 ## Endpoints
 

@@ -6,7 +6,7 @@ import requests
 import json
 
 # Test endpoint (no auth required)
-url = "http://localhost:8000/api/v1/therapy-reports/summary/ai/test"
+url = "https://ssm-system-bveh.onrender.com/api/v1/therapy-reports/summary/ai/test"
 
 # Payload - change student_id to match a student in your database
 payload = {

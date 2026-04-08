@@ -1,7 +1,7 @@
 """Quick test to check if the endpoint accepts POST requests"""
 import requests
 
-API_URL = "http://localhost:8000/api/v1/students/upload-report"
+API_URL = "https://ssm-system-bveh.onrender.com/api/v1/students/upload-report"
 
 # Test OPTIONS to see allowed methods
 print("Testing OPTIONS request...")

@@ -25,7 +25,7 @@ python test_enhanced_ocr.py assessment_form.jpg
 
 2. **Test with curl**:
    ```bash
-   curl -X POST "http://localhost:8000/api/ocr/extract" \
+   curl -X POST "https://ssm-system-bveh.onrender.com/api/ocr/extract" \
      -H "Content-Type: multipart/form-data" \
      -F "file=@assessment_form.jpg"
    ```
@@ -34,7 +34,7 @@ python test_enhanced_ocr.py assessment_form.jpg
    ```python
    import requests
    
-   url = "http://localhost:8000/api/ocr/extract"
+   url = "https://ssm-system-bveh.onrender.com/api/ocr/extract"
    files = {"file": open("assessment_form.jpg", "rb")}
    response = requests.post(url, files=files)
    

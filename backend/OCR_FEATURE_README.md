@@ -47,7 +47,7 @@ Upload an image file containing a table to extract data.
 
 **Example using cURL:**
 ```bash
-curl -X POST "http://localhost:8000/api/v1/students/upload-report" \
+curl -X POST "https://ssm-system-bveh.onrender.com/api/v1/students/upload-report" \
   -H "accept: application/json" \
   -F "file=@/path/to/report.jpg"
 ```
@@ -56,7 +56,7 @@ curl -X POST "http://localhost:8000/api/v1/students/upload-report" \
 ```python
 import requests
 
-url = "http://localhost:8000/api/v1/students/upload-report"
+url = "https://ssm-system-bveh.onrender.com/api/v1/students/upload-report"
 files = {"file": open("report.jpg", "rb")}
 response = requests.post(url, files=files)
 print(response.json())
@@ -105,7 +105,7 @@ const handleImageUpload = async (file) => {
   formData.append('file', file);
   
   try {
-    const response = await fetch('http://localhost:8000/api/v1/students/upload-report', {
+    const response = await fetch('https://ssm-system-bveh.onrender.com/api/v1/students/upload-report', {
       method: 'POST',
       body: formData
     });

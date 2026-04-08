@@ -9,7 +9,7 @@ print("=" * 70)
 
 try:
     response = requests.post(
-        "http://localhost:8000/api/v1/auth/login",
+        "https://ssm-system-bveh.onrender.com/api/v1/auth/login",
         data={
             "username": "STU2026005",
             "password": "17042025"

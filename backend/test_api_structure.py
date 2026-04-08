@@ -12,7 +12,7 @@ def test_api():
     print("=" * 40)
     
     # Test endpoint
-    url = "http://localhost:8000/api/v1/therapy-reports/summary/ai"
+    url = "https://ssm-system-bveh.onrender.com/api/v1/therapy-reports/summary/ai"
     
     # Sample payload
     payload = {
