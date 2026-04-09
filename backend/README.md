@@ -10,6 +10,7 @@ This is the backend API for the Special School Management System, built with Fas
 - Alembic migrations for database versioning
 
 ## Requirements
+##changes
 
 - Python 3.8+
 - PostgreSQL
@@ -67,8 +68,8 @@ The API will be available at http://localhost:8000
 
 ## API Documentation
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: https://ssm-system-bveh.onrender.com/docs
+- ReDoc: https://ssm-system-bveh.onrender.com/redoc
 
 ## Endpoints
 

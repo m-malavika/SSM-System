@@ -1,9 +1,604 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+// ...existing code...
+
+import { useNavigate, useLocation, useParams } from 'react-router-dom'; // Make sure useParams is imported
+import { validateStudent, formatAadhaar, cleanAadhaar } from '../utils/validation';
+// === REPLACE your old DynamicScrollButtons component with this new, refined version ===
+const DynamicScrollButtons = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isScrollingUp, setIsScrollingUp] = useState(false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      // === NEW LOGIC START ===
+
+      // 1. Define the "dead zones" at the top and bottom of the page
+      const topThreshold = 200; // Don't show any button within the first 200px
+      const bottomOffset = 200; // Don't show any button within the last 200px of the page
+      
+      const isNearBottom = window.innerHeight + currentScrollY >= document.documentElement.offsetHeight - bottomOffset;
+
+      // 2. Set visibility: only show buttons if we are outside the dead zones
+      if (currentScrollY > topThreshold && !isNearBottom) {
+        setIsVisible(true);
+      } else {
+        setIsVisible(false);
+      }
+
+      // 3. Determine scroll direction (this logic is the same)
+      if (currentScrollY > lastScrollY.current) {
+        setIsScrollingUp(false); // User is scrolling DOWN
+      } else {
+        setIsScrollingUp(true);  // User is scrolling UP
+      }
+
+      // 4. Update the last scroll position for the next event
+      lastScrollY.current = currentScrollY;
+      
+      // === NEW LOGIC END ===
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // Run on initial mount
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const scrollToBottom = () => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  };
+
+  return (
+    <div className={`fixed z-50 bottom-8 right-8 flex flex-col gap-3 transition-opacity duration-300 ${
+        isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+    >
+      {isScrollingUp ? (
+        // Scroll to Top Button
+        <button
+          onClick={scrollToTop}
+          title="Back to Top"
+          className="w-12 h-12 flex items-center justify-center rounded-full bg-[#E38B52] text-white shadow-lg transition-transform duration-300 hover:scale-110 hover:bg-[#C8742F] focus:outline-none"
+          aria-label="Back to Top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+      ) : (
+        // Scroll to Bottom Button
+        <button
+          onClick={scrollToBottom}
+          title="Scroll to Bottom"
+          className="w-12 h-12 flex items-center justify-center rounded-full bg-[#E38B52] text-white shadow-lg transition-transform duration-300 hover:scale-110 hover:bg-[#C8742F] focus:outline-none"
+          aria-label="Scroll to Bottom"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+};
+
+
+
 
 const AddStudent = () => {
+    const mainContentRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams();
   const [activeTab, setActiveTab] = useState("student-details");
+  const [activeCaseSection, setActiveCaseSection] = useState("identification");
+  const [activeEducationSubsection, setActiveEducationSubsection] = useState("self-help");
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedStudent, setSavedStudent] = useState(null); // store created/selected student
+  // eslint-disable-next-line
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [aadharError, setAadharError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [documents, setDocuments] = useState({
+    aadhar: null,
+    birth_certificate: null,
+    disability_certificate: null,
+    ration_card: null,
+    pwd_registration: null,
+    medical_certificate: null,
+    ud_id: null,
+    hospital_assessment_report: null,
+    passbook: null,
+    nish_psychological_assessment: null
+  });
+ const [studentForm, setStudentForm] = useState({
+    // Existing Student Details
+    name: '',
+    age: '',
+    dob: '',
+    gender: '',
+    religion: '',
+    caste: '',
+    caste_text: '',
+    class_name: '',
+    roll_no: '',
+    birth_place: '',
+    house_name: '',
+    street_name: '',
+    post_office: '',
+    pin_code: '',
+    revenue_district: '',
+    block_panchayat: '',
+    local_body: '',
+    taluk: '',
+    phone_number: '',
+    email: '',
+    aadhar_number: '',
+    academic_year: '',
+    admission_number: '',
+    admission_date: '',
+    class_teacher: '',
+    bank_name: '',
+    account_number: '',
+    branch: '',
+    ifsc_code: '',
+    disability_type: '',
+    disability_percentage: '',
+    identification_marks: '',
+    blood_group: '',
+    category: '',
+
+    // NEW: Flattened Case Record Fields
+    father_name: '',
+    father_education: '',
+    father_occupation: '',
+    mother_name: '',
+    mother_education: '',
+    mother_occupation: '',
+    guardian_name: '',
+    guardian_occupation: '',
+    guardian_relationship: '',
+    guardian_contact: '',
+    total_family_income: '',
+    address_and_phone: '',
+    informant_name: '',
+    informant_relationship: '',
+    duration_of_contact: '',
+    present_complaints: '',
+    previous_treatments: '',
+    family_history_mental_illness: '',
+    family_history_mental_retardation: '',
+    family_history_epilepsy: '',
+    prenatal_history: '',
+    natal_history: '',
+    postnatal_history: '',
+     smiles_at_other: false,
+    head_control: false,
+    sitting: false,
+    responds_to_name: false,
+    babbling: false,
+    first_words: false,
+    standing: false,
+    walking: false,
+    two_word_phrases: false,
+    toilet_control: false,
+    sentences: false,
+    physical_deformity: false,
+    school_history: '',
+    occupational_history: '',
+    behaviour_problems: '',
+    psychological_assessment: '',
+    medical_examination: '',
+    diagnosis: '',
+    management_plan: '',
+    eating_habits: '',
+    drinking_habits: '',
+    toilet_habits: '',
+    brushing: '',
+    bathing: '',
+    dressing_removing_wearing: '',
+    dressing_buttoning: '',
+    dressing_footwear: '',
+    dressing_grooming: '',
+    gross_motor: '',
+    fine_motor: '',
+    sensory: '',
+    language_communication: '',
+    social_behaviour: '',
+    mobility_in_neighborhood: '',
+    attention: '',
+    identification_of_objects: '',
+    use_of_objects: '',
+    following_instruction: '',
+    awareness_of_danger: '',
+    concept_color: '',
+    concept_size: '',
+    concept_sex: '',
+    concept_shape: '',
+    concept_number: '',
+    concept_time: '',
+    concept_money: '',
+    academic_reading: '',
+    academic_writing: '',
+    academic_arithmetic: '',
+    prevocational_ability: '',
+    prevocational_interest: '',
+    prevocational_dislike: '',
+    any_peculiar_behaviour: '',
+    any_other: '',
+    recommendation: '',
+    specific_diagnostic: '',
+    is_on_regular_drugs: '',
+    drug_allergy: '',
+    food_allergy: '',
+  });
+  
+ useEffect(() => {
+    // Check if navigation state contains a defaultTab preference
+    if (location.state?.defaultTab) {
+      setActiveTab(location.state.defaultTab);
+    }
+  }, [location.state]); // This effect runs only when the navigation state changes
+
+  // === PASTE THE NEW CODE HERE ===
+  useEffect(() => {
+    // 1. If URL has an ID, try to load the student for editing. If it's deleted (404), switch to create mode.
+    if (id) {
+      const fetchStudentForEdit = async () => {
+        const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+        try {
+          const response = await fetch(`${baseUrl}/api/v1/students/${id}`);
+
+          // If the student was deleted, the API returns 404 — switch to create mode instead of showing an error
+          if (response.status === 404) {
+            console.warn(`Student ${id} not found (404) — switching to create mode.`);
+            setSavedStudent(null);
+            // Replace the URL so the component no longer attempts to load the deleted student
+            navigate('/add-student', { replace: true });
+            return;
+          }
+
+          if (!response.ok) {
+            // Other non-OK responses (500, etc.) — surface a friendly message but don't crash the UI
+            console.error('Failed to fetch student for editing. Status:', response.status);
+            alert('Could not load student data. Please try again later.');
+            return;
+          }
+
+              const data = await response.json();
+              // Normalize category so it matches the select option values when editing
+              const normalizeCaste = (c) => {
+                if (!c && c !== "") return "";
+                const v = String(c).trim().toLowerCase();
+                if (!v) return "";
+                if (v === "general" || v === "gen") return "General";
+                if (v === "sc") return "SC";
+                if (v === "st") return "ST";
+                if (v === "obc") return "OBC";
+                // fallback: capitalize first letter
+                return c;
+              };
+              // Pre-fill the form with the fetched data and mark as saved (edit mode)
+              const normalized = { ...data, caste: normalizeCaste(data?.caste) };
+              setStudentForm(normalized);
+              setSavedStudent(normalized);
+        } catch (error) {
+          // Network errors (fetch failed) will be TypeError in browsers
+          console.error('Network error while fetching student for edit:', error);
+          alert('Network error: could not contact server. Check your connection and try again.');
+        }
+      };
+
+      fetchStudentForEdit();
+    }
+
+    // 2. Check if the navigation state requested a specific tab to be opened
+    if (location.state?.defaultTab) {
+      setActiveTab(location.state.defaultTab);
+    }
+  }, [id, location.state, navigate]);
+  // === END OF NEW CODE ===
+
+
+  const handleFieldChange = (field) => (e) => {
+    const value = e?.target ? e.target.value : e;
+
+    // Aadhaar: format while typing and validate locally
+    if (field === 'aadhar_number') {
+      const formatted = formatAadhaar(value);
+      setStudentForm((prev) => ({ ...prev, [field]: formatted }));
+      const cleaned = cleanAadhaar(formatted);
+      if (!cleaned) setAadharError('');
+      else if (!/^[2-9]\d{11}$/.test(cleaned)) setAadharError('Aadhaar must be 12 digits and start with 2-9.');
+      else setAadharError('');
+      return;
+    }
+
+    // Phone: numeric only, restrict to 10 digits
+    if (field === 'phone_number') {
+      const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+      setStudentForm((prev) => ({ ...prev, [field]: digits }));
+      return;
+    }
+
+    // Pin code: numeric only, 6 digits
+    if (field === 'pin_code') {
+      const digits = String(value || '').replace(/\D/g, '').slice(0, 6);
+      setStudentForm((prev) => ({ ...prev, [field]: digits }));
+      return;
+    }
+
+    // IFSC: uppercase letters, no spaces, max 11 chars
+    if (field === 'ifsc_code') {
+      const v = String(value || '').replace(/\s+/g, '').toUpperCase().slice(0, 11);
+      setStudentForm((prev) => ({ ...prev, [field]: v }));
+      return;
+    }
+
+    setStudentForm((prev) => ({ ...prev, [field]: value }));
+  };
+  
+  const handleDocumentUpload = (docType) => (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        alert('Please upload only PDF files.');
+        e.target.value = ''; // Reset the input
+        return;
+      }
+      setDocuments((prev) => ({ ...prev, [docType]: file }));
+    }
+  };
+
+  const handleRemoveDocument = (docType) => {
+    setDocuments((prev) => ({ ...prev, [docType]: null }));
+    // Reset the file input
+    const input = document.getElementById(`document-${docType}`);
+    if (input) input.value = '';
+  };
+
+   const handleCheckboxChange = (field) => (e) => {
+    setStudentForm((prev) => ({ ...prev, [field]: e.target.checked }));
+  };
+const handleMedicalConditionsChange = (condition) => (e) => {
+    const isChecked = e.target.checked;
+    setStudentForm((prev) => {
+      const conditions = prev.medical_conditions ? prev.medical_conditions.split(', ') : [];
+      if (isChecked) {
+        if (!conditions.includes(condition)) {
+          conditions.push(condition);
+        }
+      } else {
+        const index = conditions.indexOf(condition);
+        if (index > -1) {
+          conditions.splice(index, 1);
+        }
+      }
+      return { ...prev, medical_conditions: conditions.join(', ') };
+    });
+  };
+const saveStudent = async () => {
+    // This function will now either return the saved student data or throw an error.
+    const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+    // Form-level validation using shared validators
+    setErrors({});
+    const { valid, errors: verrors } = validateStudent(studentForm);
+    if (!valid) {
+      setErrors(verrors);
+      const firstKey = Object.keys(verrors)[0];
+      const firstMsg = Object.values(verrors)[0];
+      // Try to focus and scroll to the first invalid field if possible
+      try {
+        const el = document.getElementById(firstKey);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // focus if focusable
+          if (typeof el.focus === 'function') el.focus();
+        }
+      } catch (err) {
+        // ignore
+      }
+      alert('Please fix validation errors: ' + firstMsg);
+      throw new Error('Validation failed');
+    }
+
+    // Prevent saving when Aadhaar is still flagged by inline check
+    if (aadharError) {
+      throw new Error(aadharError || 'Invalid Aadhaar number');
+    }
+
+    const payload = {
+      name: studentForm.name,
+      age: studentForm.age,
+      dob: studentForm.dob,
+      gender: studentForm.gender,
+      religion: studentForm.religion,
+      caste: studentForm.caste,
+      caste_text: studentForm.caste_text,
+      class_name: studentForm.class_name,
+      roll_no: studentForm.roll_no,
+      birth_place: studentForm.birth_place,
+      house_name: studentForm.house_name,
+      street_name: studentForm.street_name,
+      post_office: studentForm.post_office,
+      pin_code: studentForm.pin_code,
+      revenue_district: studentForm.revenue_district,
+      block_panchayat: studentForm.block_panchayat,
+      local_body: studentForm.local_body,
+      taluk: studentForm.taluk,
+      phone_number: studentForm.phone_number,
+      email: studentForm.email,
+      father_name: studentForm.father_name,
+      father_education: studentForm.father_education,
+      father_occupation: studentForm.father_occupation,
+      mother_name: studentForm.mother_name,
+      mother_education: studentForm.mother_education,
+      mother_occupation: studentForm.mother_occupation,
+      guardian_name: studentForm.guardian_name,
+      guardian_relationship: studentForm.guardian_relationship,
+      guardian_occupation: studentForm.guardian_occupation,
+      guardian_contact: studentForm.guardian_contact,
+      academic_year: studentForm.academic_year,
+      admission_number: studentForm.admission_number,
+      admission_date: studentForm.admission_date,
+      class_teacher: studentForm.class_teacher,
+      bank_name: studentForm.bank_name,
+      account_number: studentForm.account_number,
+      branch: studentForm.branch,
+      ifsc_code: studentForm.ifsc_code,
+      aadhar_number: studentForm.aadhar_number ? String(studentForm.aadhar_number).replace(/\s+/g, '') : null,
+      disability_type: studentForm.disability_type,
+      disability_percentage: studentForm.disability_percentage,
+      medical_conditions: studentForm.medical_conditions,
+      allergies: studentForm.allergies,
+      identification_marks: studentForm.identification_marks,
+      blood_group: studentForm.blood_group || null,
+      category: studentForm.category || null,
+      total_family_income: studentForm.total_family_income,
+  // Contact / Case Record fields
+  informant_name: studentForm.informant_name,
+  informant_relationship: studentForm.informant_relationship,
+  duration_of_contact: studentForm.duration_of_contact,
+  present_complaints: studentForm.present_complaints,
+  previous_treatments: studentForm.previous_treatments,
+  // Family medical history
+  family_history_mental_illness: studentForm.family_history_mental_illness,
+  family_history_mental_retardation: studentForm.family_history_mental_retardation,
+  family_history_epilepsy: studentForm.family_history_epilepsy,
+  // Birth history
+  prenatal_history: studentForm.prenatal_history,
+  natal_history: studentForm.natal_history,
+  postnatal_history: studentForm.postnatal_history,
+  // Development history booleans
+  smiles_at_other: studentForm.smiles_at_other,
+  head_control: studentForm.head_control,
+  sitting: studentForm.sitting,
+  responds_to_name: studentForm.responds_to_name,
+  babbling: studentForm.babbling,
+  first_words: studentForm.first_words,
+  standing: studentForm.standing,
+  walking: studentForm.walking,
+  two_word_phrases: studentForm.two_word_phrases,
+  toilet_control: studentForm.toilet_control,
+  sentences: studentForm.sentences,
+  physical_deformity: studentForm.physical_deformity,
+  // Special education / Assessment fields
+  eating_habits: studentForm.eating_habits,
+  drinking_habits: studentForm.drinking_habits,
+  toilet_habits: studentForm.toilet_habits,
+  brushing: studentForm.brushing,
+  bathing: studentForm.bathing,
+  dressing_removing_wearing: studentForm.dressing_removing_wearing,
+  dressing_buttoning: studentForm.dressing_buttoning,
+  dressing_footwear: studentForm.dressing_footwear,
+  dressing_grooming: studentForm.dressing_grooming,
+  gross_motor: studentForm.gross_motor,
+  fine_motor: studentForm.fine_motor,
+  sensory: studentForm.sensory,
+  language_communication: studentForm.language_communication,
+  social_behaviour: studentForm.social_behaviour,
+  mobility_in_neighborhood: studentForm.mobility_in_neighborhood,
+  attention: studentForm.attention,
+  identification_of_objects: studentForm.identification_of_objects,
+  use_of_objects: studentForm.use_of_objects,
+  following_instruction: studentForm.following_instruction,
+  awareness_of_danger: studentForm.awareness_of_danger,
+  concept_color: studentForm.concept_color,
+  concept_size: studentForm.concept_size,
+  concept_sex: studentForm.concept_sex,
+  concept_shape: studentForm.concept_shape,
+  concept_number: studentForm.concept_number,
+  concept_time: studentForm.concept_time,
+  concept_money: studentForm.concept_money,
+  academic_reading: studentForm.academic_reading,
+  academic_writing: studentForm.academic_writing,
+  academic_arithmetic: studentForm.academic_arithmetic,
+  prevocational_ability: studentForm.prevocational_ability,
+  prevocational_interest: studentForm.prevocational_interest,
+  prevocational_dislike: studentForm.prevocational_dislike,
+  school_history: studentForm.school_history,
+  occupational_history: studentForm.occupational_history,
+  behaviour_problems: studentForm.behaviour_problems,
+  special_education_assessment: studentForm.special_education_assessment,
+  psychological_assessment: studentForm.psychological_assessment,
+  medical_examination: studentForm.medical_examination,
+  diagnosis: studentForm.diagnosis,
+  management_plan: studentForm.management_plan,
+  specific_diagnostic: studentForm.specific_diagnostic,
+  is_on_regular_drugs: studentForm.is_on_regular_drugs,
+  drug_allergy: studentForm.drug_allergy,
+  food_allergy: studentForm.food_allergy,
+  drug_history: drugRows.map(r => ({ name: r.name, dose: r.dose })),
+  household: householdRows.map(r => ({ 
+    name: r.name, 
+    age: r.age, 
+    education: r.education, 
+    occupation: r.occupation, 
+    health: r.health, 
+    income: r.income 
+  })),
+    };
+    
+    if (!payload.dob) delete payload.dob;
+    if (!payload.admission_date) delete payload.admission_date;
+    if (payload.age) payload.age = parseInt(payload.age, 10) || null;
+    if (payload.total_family_income) {
+  payload.total_family_income = String(payload.total_family_income);
+} else {
+  payload.total_family_income = null;
+}
+    if (payload.disability_percentage) payload.disability_percentage = parseFloat(payload.disability_percentage) || null;
+    
+    const endpoint = savedStudent?.id
+      ? `${baseUrl}/api/v1/students/${savedStudent.id}`
+      : `${baseUrl}/api/v1/students/`;
+    const method = savedStudent?.id ? 'PUT' : 'POST';
+    
+    const res = await fetch(endpoint, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to save student details.');
+    }
+    
+    return await res.json();
+};
+
+
+// AFTER
+const handleSaveAll = async () => {
+    setIsSaving(true);
+    try {
+      // Step 1: Save ALL student details in a single API call
+      const studentData = await saveStudent();
+      
+      if (studentData && studentData.id) {
+        // Step 2: Show the final success popup
+        setSavedStudent(studentData);
+        setShowPopup(true);
+      } else {
+        throw new Error("Could not get student ID after saving.");
+      }
+      
+    } catch (e) {
+      alert(e.message || 'An error occurred during the save process.');
+    } finally {
+      setIsSaving(false);
+    }
+};
 const [householdRows, setHouseholdRows] = useState([
     { id: 1, name: '', age: '', education: '', occupation: '', health: '', income: '' }
   ]);
@@ -11,6 +606,30 @@ const [householdRows, setHouseholdRows] = useState([
   const [drugRows, setDrugRows] = useState([
     { id: 1, name: '', dose: '' }
   ]);
+
+  // Initialize drug rows from loaded student data when editing
+  useEffect(() => {
+    if (studentForm.drug_history && Array.isArray(studentForm.drug_history)) {
+      const rows = studentForm.drug_history.map((d, idx) => ({ id: idx + 1, name: d.name || '', dose: d.dose || '' }));
+      setDrugRows(rows.length ? rows : [{ id: 1, name: '', dose: '' }]);
+    }
+  }, [studentForm.drug_history]);
+
+  // Initialize household rows from loaded student data when editing
+  useEffect(() => {
+    if (studentForm.household && Array.isArray(studentForm.household)) {
+      const rows = studentForm.household.map((h, idx) => ({ 
+        id: idx + 1, 
+        name: h.name || '', 
+        age: h.age || '', 
+        education: h.education || '', 
+        occupation: h.occupation || '', 
+        health: h.health || '', 
+        income: h.income || '' 
+      }));
+      setHouseholdRows(rows.length ? rows : [{ id: 1, name: '', age: '', education: '', occupation: '', health: '', income: '' }]);
+    }
+  }, [studentForm.household]);
 
   const addDrugRow = () => {
     const newRow = {
@@ -38,10 +657,62 @@ const [householdRows, setHouseholdRows] = useState([
     navigate('/');
   };
 
-  const selectClass = "w-full px-4 py-3 pr-8 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 text-[#6F6C90]";
+const selectClass = "w-full px-4 py-3 pr-8 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 text-[#6F6C90]";
+const developmentHistoryMap = {
+    "Smiles at other": "smiles_at_other",
+    "Head Control": "head_control",
+    "Sitting": "sitting",
+    "Responds to name": "responds_to_name",
+    "Babbling": "babbling",
+    "First words": "first_words",
+    "Standing": "standing",
+    "Walking": "walking",
+    "Two word phrases": "two_word_phrases",
+    "Toilet control": "toilet_control",
+    "Sentences": "sentences",
+    "Physical Deformity": "physical_deformity",
+  };
 
+ 
+
+  
   return (
-    <div className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-x-hidden py-20">
+    <div className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative py-20">
+      {showPopup && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+        <div className="bg-white px-8 py-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-fade-in min-w-[350px]">
+            <div className="text-green-600 text-2xl font-bold">Success!</div>
+            <div className="text-gray-700 text-lg text-center">Student details have been saved.</div>
+            <div className="flex gap-4 mt-4">
+                {/* Button to Fill Case Record */}
+                <button
+                    className="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold text-lg hover:bg-blue-600 transition-all duration-200 shadow-md"
+                    onClick={() => {
+                        setShowPopup(false);
+                        setActiveTab("case-record");
+                    }}
+                >
+                    Fill Case Record
+                </button>
+                {/* Button to Go to List */}
+                <button
+                    className="bg-[#E38B52] text-white px-6 py-3 rounded-xl font-semibold text-lg hover:bg-[#C8742F] transition-all duration-200 shadow-md"
+                    onClick={() => {
+                        setShowPopup(false);
+                        navigate('/headmaster');
+                    }}
+                >
+                    Go to List
+                </button>
+            </div>
+        </div>
+    </div>
+)}
+      {showSuccess && (
+        <div className="fixed top-8 right-8 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg animate-fade-in">
+          Student details saved successfully!
+        </div>
+      )}
       {/* Back button */}
       <button
         onClick={() => window.history.back()}
@@ -63,15 +734,15 @@ const [householdRows, setHouseholdRows] = useState([
       </button>
 
       {/* Animated background blobs with fixed positioning */}
-      <div className="fixed top-0 -left-40 w-[600px] h-[500px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float z-0" />
-      <div className="fixed -bottom-32 right-40 w-[600px] h-[600px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000 z-0" />
-      <div className="fixed top-1/2 left-1/2 w-[500px] h-[500px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
+      <div className="fixed top-0 -left-40 w-[600px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float z-0" />
+      <div className="fixed -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000 z-0" />
+      <div className="fixed top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
       
       {/* Logout Button */}
       <div className="fixed top-6 right-6 z-50">
         <button
           onClick={handleLogout}
-          className="px-6 py-3 bg-[#6366f1] text-white rounded-xl hover:bg-[#4f46e5] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
+          className="px-6 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#4f46e5] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -98,6 +769,17 @@ const [householdRows, setHouseholdRows] = useState([
           Add a new student to the system
         </p>
       </div>
+      {/* Date and Day Section */}
+      <div className="mb-6 text-center z-10">
+        <p className="text-lg font-medium text-[#6F6C8F]">
+          {new Date().toLocaleDateString('en-IN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}
+        </p>
+      </div>
 
       <div className="w-[90%] max-w-[1200px] mx-4 z-10">
         {/* Tabs */}
@@ -105,11 +787,11 @@ const [householdRows, setHouseholdRows] = useState([
           <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative w-[372px]">
             {/* Active Tab Background */}
             <div
-              className="absolute h-[calc(100%-8px)] top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#6366f1] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+              className="absolute h-[calc(100%-8px)] top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#E38B52] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
               style={{
                 left: activeTab === "student-details" ? "4px" : "188px",
                 width: "180px",
-                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                background: 'linear-gradient(135deg, #E38B52 0%, #F58540 100%)',
               }}
             >
               {/* Animated particles */}
@@ -126,7 +808,7 @@ const [householdRows, setHouseholdRows] = useState([
               className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
                 activeTab === "student-details"
                   ? "text-white"
-                  : "text-[#170F49] hover:text-[#6366f1]"
+                  : "text-[#170F49] hover:text-[#E38B52]"
               }`}
             >
               Student Details
@@ -138,7 +820,7 @@ const [householdRows, setHouseholdRows] = useState([
               className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
                 activeTab === "case-record"
                   ? "text-white"
-                  : "text-[#170F49] hover:text-[#6366f1]"
+                  : "text-[#170F49] hover:text-[#E38B52]"
               }`}
             >
               Case Record
@@ -160,27 +842,38 @@ const [householdRows, setHouseholdRows] = useState([
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Name of Student</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        id="name"
+                         className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter student's full name"
+                         value={studentForm.name}
+                         onChange={handleFieldChange('name')}
                       />
+                      {errors.name && (<p className="text-red-500 text-xs mt-1">{errors.name}</p>)}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Age</label>
                         <input
-                          type="number"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                          type="text"
+                          id="age"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                           placeholder="Age"
+                          value={studentForm.age}
+                          onChange={handleFieldChange('age')}
                         />
+                        {errors.age && (<p className="text-red-500 text-xs mt-1">{errors.age}</p>)}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Sex</label>
-                        <select className={selectClass}>
+                        <select id="gender" className={selectClass} value={studentForm.gender} onChange={handleFieldChange('gender')}>
                           <option value="">Select</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="other">Other</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
                         </select>
+                          {errors.gender && (<p className="text-red-500 text-xs mt-1">{errors.gender}</p>)}
                       </div>
                     </div>
                   </div>
@@ -194,74 +887,127 @@ const [householdRows, setHouseholdRows] = useState([
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Birth Place</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter birth place"
+                        value={studentForm.birth_place}
+                        onChange={handleFieldChange('birth_place')}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">House Name</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter house name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Street Name</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter street name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Post Office</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter post office"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Pin Code</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter pin code"
-                        maxLength="6"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Revenue District</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter revenue district"
+                        value={studentForm.house_name}
+                        onChange={handleFieldChange('house_name')}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Block Panchayat</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter block panchayat"
+                        value={studentForm.block_panchayat}
+                        onChange={handleFieldChange('block_panchayat')}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Local Body</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter local body"
+                        value={studentForm.local_body}
+                        onChange={handleFieldChange('local_body')}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Taluk</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter taluk"
+                        value={studentForm.taluk}
+                        onChange={handleFieldChange('taluk')}
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Street Name</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="Enter street name"
+                        value={studentForm.street_name}
+                        onChange={handleFieldChange('street_name')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Post Office</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="Enter post office"
+                        value={studentForm.post_office}
+                        onChange={handleFieldChange('post_office')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Pin Code</label>
+                      <input
+                        type="text"
+                        id="pin_code"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="Enter pin code"
+                        maxLength="6"
+                        value={studentForm.pin_code}
+                        onChange={handleFieldChange('pin_code')}
+                      />
+                      {errors.pin_code && (<p className="text-red-500 text-xs mt-1">{errors.pin_code}</p>)}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Revenue District</label>
+                      <input
+                        type="text"
+                        id="revenue_district"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="Enter revenue district"
+                        value={studentForm.revenue_district}
+                        onChange={handleFieldChange('revenue_district')}
+                      />
+                      {errors.revenue_district && (<p className="text-red-500 text-xs mt-1">{errors.revenue_district}</p>)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Details */}
+                <div>
+                  <h3 className="text-xl font-semibold text-[#170F49] mb-6">Contact Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Phone Number</label>
+                      <input
+                        type="tel"
+                        id="phone_number"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="Enter phone number"
+                        value={studentForm.phone_number}
+                        onChange={handleFieldChange('phone_number')}
+                      />
+                      {errors.phone_number && (<p className="text-red-500 text-xs mt-1">{errors.phone_number}</p>)}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Email</label>
+                      <input
+                        type="email"
+                        id="email"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="Enter email address"
+                        value={studentForm.email}
+                        onChange={handleFieldChange('email')}
+                      />
+                      {errors.email && (<p className="text-red-500 text-xs mt-1">{errors.email}</p>)}
                     </div>
                   </div>
                 </div>
@@ -274,52 +1020,94 @@ const [householdRows, setHouseholdRows] = useState([
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Aadhar Number</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter aadhar number"
-                        maxLength="12"
+                        inputMode="numeric"
+                        pattern="\d{4}\s?\d{4}\s?\d{4}"
+                        maxLength={14} /* allow spaces grouped as 4-4-4 */
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="1234 5678 9012"
+                        id="aadhar_number"
+                        value={studentForm.aadhar_number || ''}
+                        onChange={handleFieldChange('aadhar_number')}
+                        title="Enter 12-digit Aadhaar number (groups of 4 digits allowed)"
                       />
+                      {aadharError && (<p className="text-red-500 text-xs mt-1">{aadharError}</p>)}
+                      {errors.aadhar_number && !aadharError && (<p className="text-red-500 text-xs mt-1">{errors.aadhar_number}</p>)}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">UD ID</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        inputMode='alpha-numeric'
+                        pattern='^[A-Z]{2}[0-9]{2}[A-Z0-9]{1}[0-9]{2}[0-9]{4}[0-9]{6}[0-9]{1}$'
+                        placeholder="KL14B0519850001239"
+                        maxLength={18}
+                        id="ud_id"
+                        value={studentForm.ud_id}
+                        onChange={handleFieldChange('ud_id')}
+                        title="Enter 18-digit Unique Disability ID (groups of 4 digits allowed)"
+                      />
+                      {errors.ud_id && (<p className="text-red-500 text-xs mt-1">{errors.ud_id}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Date of Birth</label>
                       <input
                         type="date"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        id="dob"
+                        value={studentForm.dob}
+                        onChange={handleFieldChange('dob')}
                       />
+                      {errors.dob && (<p className="text-red-500 text-xs mt-1">{errors.dob}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Date of Admission</label>
                       <input
                         type="date"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        id="admission_date"
+                        value={studentForm.admission_date}
+                        onChange={handleFieldChange('admission_date')}
                       />
+                      {errors.admission_date && (<p className="text-red-500 text-xs mt-1">{errors.admission_date}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Admission Number</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter admission number"
+                        id="admission_number"
+                        value={studentForm.admission_number}
+                        onChange={handleFieldChange('admission_number')}
                       />
+                      {errors.admission_number && (<p className="text-red-500 text-xs mt-1">{errors.admission_number}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Father's Name</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter father's name"
+                        value={studentForm.father_name}
+                        onChange={handleFieldChange('father_name')}
                       />
+                      {errors.father_name && (<p className="text-red-500 text-xs mt-1">{errors.father_name}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Mother's Name</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter mother's name"
+                        value={studentForm.mother_name}
+                        onChange={handleFieldChange('mother_name')}
                       />
+                      {errors.mother_name && (<p className="text-red-500 text-xs mt-1">{errors.mother_name}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Religion</label>
-                      <select className={selectClass}>
+                      <select className={selectClass} value={studentForm.religion} onChange={handleFieldChange('religion')}>
                         <option value="">Select religion</option>
                         <option value="hinduism">Hinduism</option>
                         <option value="christianity">Christianity</option>
@@ -327,16 +1115,112 @@ const [householdRows, setHouseholdRows] = useState([
                         <option value="sikhism">Sikhism</option>
                         <option value="buddhism">Buddhism</option>
                         <option value="jainism">Jainism</option>
-                        <option value="other">Other</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Category</label>
+                      <select
+                        className={selectClass}
+                        value={studentForm.caste}
+                        onChange={handleFieldChange('caste')}
+                      >
+                        <option value="">Select category</option>
+                        <option value="General">General</option>
+                        <option value="SC">SC</option>
+                        <option value="ST">ST</option>
+                        <option value="OBC">OBC</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Caste</label>
+                      <textarea
+                        id="caste_text"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                        placeholder="Enter caste"
+                        maxLength={30}
+                        rows={1}
+                        value={studentForm.caste_text}
+                        onChange={handleFieldChange('caste_text')}
+                      ></textarea>
+                      {errors.caste_text && (<p className="text-red-500 text-xs mt-1">{errors.caste_text}</p>)}
+                    </div>
+                  </div>
+
+                </div>
+                
+
+                {/* Academic Information */}
+                <div>
+                  <h3 className="text-xl font-semibold text-[#170F49] mb-6">Academic Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Class Name</label>
+                      <select
+                        className={selectClass}
+                        value={studentForm.class_name}
+                        onChange={handleFieldChange('class_name')}
+                      >
+                        <option value="">Select Class</option>
+                        <option value="PrePrimary">PrePrimary</option>
+                        <option value="Primary 1">Primary 1</option>
+                        <option value="Primary 2">Primary 2</option>
+                        <option value="Secondary">Secondary</option>
+                        <option value="Pre vocational 1">Pre vocational 1</option>
+                        <option value="Pre vocational 2">Pre vocational 2</option>
+                        <option value="Care group below 18 years">Care group below 18 years</option>
+                        <option value="Care group Above 18 years">Care group Above 18 years</option>
+                        <option value="Vocational 18-35 years">Vocational 18-35 years</option>
+                      </select>
+                      {errors.class_name && (<p className="text-red-500 text-xs mt-1">{errors.class_name}</p>)}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Roll Number</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter caste"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        id="roll_no"
+                        placeholder="Enter roll number"
+                        value={studentForm.roll_no}
+                        onChange={handleFieldChange('roll_no')}
                       />
+                      {errors.roll_no && (<p className="text-red-500 text-xs mt-1">{errors.roll_no}</p>)}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Academic Year</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="e.g., 2024-2025"
+                        id="academic_year"
+                        value={studentForm.academic_year}
+                        onChange={handleFieldChange('academic_year')}
+                      />
+                      {errors.academic_year && (<p className="text-red-500 text-xs mt-1">{errors.academic_year}</p>)}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Class Teacher</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="Enter class teacher's name"
+                        id="class_teacher"
+                        value={studentForm.class_teacher}
+                        onChange={handleFieldChange('class_teacher')}
+                      />
+                      {errors.class_teacher && (<p className="text-red-500 text-xs mt-1">{errors.class_teacher}</p>)}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Division (optional)</label>
+                      <input
+                        id="division"
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        placeholder="e.g., A, B"
+                        value={studentForm.division || ''}
+                        onChange={handleFieldChange('division')}
+                      />
+                      {errors.division && (<p className="text-red-500 text-xs mt-1">{errors.division}</p>)}
                     </div>
                   </div>
                 </div>
@@ -349,8 +1233,10 @@ const [householdRows, setHouseholdRows] = useState([
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Type of Disability</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter type of disability"
+                        value={studentForm.disability_type}
+                        onChange={handleFieldChange('disability_type')}
                       />
                     </div>
                     <div>
@@ -359,9 +1245,13 @@ const [householdRows, setHouseholdRows] = useState([
                         type="number"
                         min="0"
                         max="100"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter percentage"
+                        id="disability_percentage"
+                        value={studentForm.disability_percentage}
+                        onChange={handleFieldChange('disability_percentage')}
                       />
+                      {errors.disability_percentage && (<p className="text-red-500 text-xs mt-1">{errors.disability_percentage}</p>)}
                     </div>
                   </div>
                 </div>
@@ -374,33 +1264,49 @@ const [householdRows, setHouseholdRows] = useState([
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Account Number</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter account number"
+                        id="account_number"
+                        value={studentForm.account_number}
+                        onChange={handleFieldChange('account_number')}
                       />
+                      {errors.account_number && (<p className="text-red-500 text-xs mt-1">{errors.account_number}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Bank Name</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter bank name"
+                        id="bank_name"
+                        value={studentForm.bank_name}
+                        onChange={handleFieldChange('bank_name')}
                       />
+                      {errors.bank_name && (<p className="text-red-500 text-xs mt-1">{errors.bank_name}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Branch</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter branch name"
+                        id="branch"
+                        value={studentForm.branch}
+                        onChange={handleFieldChange('branch')}
                       />
+                      {errors.branch && (<p className="text-red-500 text-xs mt-1">{errors.branch}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">IFSC Code</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter IFSC code"
+                        id="ifsc_code"
+                        value={studentForm.ifsc_code}
+                        onChange={handleFieldChange('ifsc_code')}
                       />
+                      {errors.ifsc_code && (<p className="text-red-500 text-xs mt-1">{errors.ifsc_code}</p>)}
                     </div>
                   </div>
                 </div>
@@ -410,54 +1316,201 @@ const [householdRows, setHouseholdRows] = useState([
                   <h3 className="text-xl font-semibold text-[#170F49] mb-6">Identification Marks</h3>
                   <div className="space-y-4">
                     <textarea
-                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
+                      id="identification_marks"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
                       rows="3"
                       placeholder="Enter identification marks"
+                      value={studentForm.identification_marks}
+                      onChange={handleFieldChange('identification_marks')}
                     ></textarea>
+                    {errors.identification_marks && (<p className="text-red-500 text-xs mt-1">{errors.identification_marks}</p>)}
                   </div>
                 </div>
 
                 {/* Document Upload */}
                 <div>
                   <h3 className="text-xl font-semibold text-[#170F49] mb-6">Document Upload</h3>
-                  <div className="space-y-4">
-                    <label 
-                      htmlFor="document-upload" 
-                      className="block w-full p-4 border-2 border-dashed border-[#6366f1] rounded-xl text-center cursor-pointer hover:bg-white/50 transition-all duration-200"
-                    >
-                      <svg 
-                        className="mx-auto mb-2" 
-                        width="24" 
-                        height="24" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="17 8 12 3 7 8"/>
-                        <line x1="12" y1="3" x2="12" y2="15"/>
-                      </svg>
-                      <span className="text-[#6366f1] font-medium">Upload Documents</span>
-                      <span className="block text-sm text-[#6F6C90] mt-1">Upload relevant documents (PDF format)</span>
-                    </label>
-                    <input type="file" id="document-upload" className="hidden" accept=".pdf" />
+                  <div className="space-y-6">
+                    {/* Document Upload Areas */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Document Upload Component */}
+                      {[
+                        { key: 'aadhar', label: 'Aadhar' },
+                        { key: 'birth_certificate', label: 'Birth Certificate' },
+                        { key: 'disability_certificate', label: 'Disability Certificate' },
+                        { key: 'ration_card', label: 'Ration Card' },
+                        { key: 'pwd_registration', label: 'Person with Disability Registration' },
+                        { key: 'medical_certificate', label: 'Medical Certificate' },
+                        { key: 'ud_id', label: 'Unique Disability ID (UD ID)' },
+                        { key: 'hospital_assessment_report', label: 'Assessment Report from Hospital' },
+                        { key: 'passbook', label: 'Passbook' },
+                        { key: 'nish_psychological_assessment', label: 'NISH Psychological Assessment Report' }
+                      ].map((doc) => (
+                        <div key={doc.key} className="space-y-2">
+                          <label className="block text-sm font-medium text-[#170F49] mb-2">{doc.label}</label>
+                          <label 
+                            htmlFor={`document-${doc.key}`} 
+                            className="block w-full p-4 border-2 border-dashed border-[#E38B52] rounded-xl text-center cursor-pointer hover:bg-white/50 transition-all duration-200"
+                          >
+                            <svg 
+                              className="mx-auto mb-2" 
+                              width="24" 
+                              height="24" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            >
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                              <polyline points="17 8 12 3 7 8"/>
+                              <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <span className="text-[#E38B52] font-medium text-sm">
+                              {documents[doc.key] ? documents[doc.key].name : `Upload ${doc.label} (PDF)`}
+                            </span>
+                          </label>
+                          <input 
+                            type="file" 
+                            id={`document-${doc.key}`} 
+                            className="hidden" 
+                            accept=".pdf" 
+                            onChange={handleDocumentUpload(doc.key)}
+                          />
+                          {documents[doc.key] && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDocument(doc.key)}
+                              className="text-red-500 text-xs hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Uploaded Documents List */}
+                    {Object.values(documents).some(doc => doc !== null) && (
+                      <div className="mt-6">
+                        <h4 className="text-lg font-semibold text-[#170F49] mb-4">Uploaded Documents</h4>
+                        <div className="bg-white/50 rounded-xl p-4 border border-[#E38B52]/20">
+                          <ul className="space-y-2">
+                            {[
+                              { key: 'aadhar', label: 'Aadhar' },
+                              { key: 'birth_certificate', label: 'Birth Certificate' },
+                              { key: 'disability_certificate', label: 'Disability Certificate' },
+                              { key: 'ration_card', label: 'Ration Card' },
+                              { key: 'pwd_registration', label: 'Person with Disability Registration' },
+                              { key: 'medical_certificate', label: 'Medical Certificate' },
+                              { key: 'ud_id', label: 'Unique Disability ID (UD ID)' },
+                              { key: 'hospital_assessment_report', label: 'Assessment Report from Hospital' },
+                              { key: 'passbook', label: 'Passbook' },
+                              { key: 'nish_psychological_assessment', label: 'NISH Psychological Assessment Report' }
+                            ].map((doc) => documents[doc.key] && (
+                              <li key={doc.key} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                                  </svg>
+                                  <span className="text-sm text-[#170F49]">{doc.label}: {documents[doc.key].name}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDocument(doc.key)}
+                                  className="text-red-500 hover:text-red-700 text-xs"
+                                >
+                                  Remove
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-8">
-              {/* Identification Data */}
-              <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#6366f1]/20 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#6366f1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                  </svg>
-                  Identification Data
-                </h2>
+            <div className="flex gap-6 items-start justify-center relative max-w-[1600px] mx-auto" ref={mainContentRef}>
+              {/* Left Sidebar Navigation */}
+              <aside className="w-64 flex-shrink-0 sticky top-5 self-start">
+                <div
+                  className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-6 border border-white/20 w-64 z-30 max-h-[calc(100vh-40px)] overflow-y-auto"
+                >
+                  <h3 className="text-lg font-bold text-[#170F49] mb-6 pb-3 border-b border-[#E38B52]/20">
+                    Case Record Sections
+                  </h3>
+                  <nav className="space-y-2">
+                    {[
+                      { id: 'identification', label: 'Identification Data', icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                        </svg>
+                      ) },
+                      { id: 'demographic', label: 'Demographic Data', icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      ) },
+                      { id: 'contact', label: 'Contact Information', icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                      ) },
+                      { id: 'family', label: 'Family History', icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                      ) },
+                      { id: 'additional', label: 'Additional Information', icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      ) },
+                      { id: 'education', label: 'Special Education', icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                      ) },
+                      { id: 'medical', label: 'Medical Information', icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      ) }
+                    ].map((section) => (
+                      <button
+                        key={section.id}
+                        onClick={() => setActiveCaseSection(section.id)}
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-3 ${
+                          activeCaseSection === section.id
+                            ? 'bg-[#E38B52] text-white shadow-lg'
+                            : 'bg-white/50 text-[#170F49] hover:bg-white/80'
+                        }`}
+                      >
+                        <span className={`transition-all duration-300 ${
+                          activeCaseSection === section.id ? 'text-white' : 'text-[#E38B52]'
+                        }`}>{section.icon}</span>
+                        <span className="text-sm font-medium">{section.label}</span>
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+              </aside>
+
+              {/* Right Content Area */}
+              <div className="flex-1 max-w-[1100px]" ref={mainContentRef}>
+                {/* Identification Data */}
+                {activeCaseSection === 'identification' && (
+                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                    <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                      </svg>
+                      Identification Data
+                    </h2>
 
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -465,24 +1518,26 @@ const [householdRows, setHouseholdRows] = useState([
                       <label className="block text-sm font-medium text-[#170F49]">Name</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter name"
+                         value={studentForm.name}
+                         onChange={handleFieldChange('name')}
                       />
                     </div>
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-[#170F49]">Sex</label>
-                      <select className={selectClass}>
+                      <select className={selectClass} value={studentForm.gender} onChange={handleFieldChange('gender')}>
                         <option value="">Select sex</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="other">Other</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-[#170F49]">Religion</label>
-                      <select className={selectClass}>
+                      <select className={selectClass} value={studentForm.religion} onChange={handleFieldChange('religion')}>
                         <option value="">Select religion</option>
                         <option value="hinduism">Hinduism</option>
                         <option value="christianity">Christianity</option>
@@ -490,7 +1545,7 @@ const [householdRows, setHouseholdRows] = useState([
                         <option value="sikhism">Sikhism</option>
                         <option value="buddhism">Buddhism</option>
                         <option value="jainism">Jainism</option>
-                        <option value="other">Other</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
 
@@ -498,65 +1553,82 @@ const [householdRows, setHouseholdRows] = useState([
                       <label className="block text-sm font-medium text-[#170F49]">Admission Number</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         placeholder="Enter admission number"
+                        value={studentForm.admission_number}
+                        onChange={handleFieldChange('admission_number')}
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-[#170F49]">Education</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter education"
-                      />
-                    </div>
+                    {/* Education Field */}
+<div className="space-y-2">
+  <label className="block text-sm font-medium text-[#170F49]">Education</label>
+  <input
+    type="text"
+    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg..."
+    placeholder="Enter education"
+    value={studentForm.education}
+    onChange={handleFieldChange('education')}
+  />
+</div>
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-[#170F49]">Date of Birth</label>
                       <input
                         type="date"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        value={studentForm.dob}
+                        onChange={handleFieldChange('dob')}
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-[#170F49]">Age</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter age"
-                      />
-                    </div>
+                    {/* Age Field */}
+<div className="space-y-2">
+  <label className="block text-sm font-medium text-[#170F49]">Age</label>
+  <input
+    type="text"
+    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg..."
+    placeholder="Enter age"
+    value={studentForm.age}
+    onChange={handleFieldChange('age')}
+  />
+</div>
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-[#170F49]">Blood Group</label>
-                      <select className={selectClass}>
-                        <option value="">Select blood group</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                      </select>
-                    </div>
+                      <select 
+    className={selectClass}
+    value={studentForm.blood_group}
+    onChange={handleFieldChange('blood_group')}
+  >
+    <option value="">Select blood group</option>
+    <option value="A+">A+</option>
+    <option value="A-">A-</option>
+    <option value="B+">B+</option>
+    <option value="B-">B-</option>
+    <option value="AB+">AB+</option>
+    <option value="AB-">AB-</option>
+    <option value="O+">O+</option>
+    <option value="O-">O-</option>
+  </select>
+</div>
 
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-[#170F49]">Aadhar Number</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter Aadhar number"
-                      />
-                    </div>
+                    {/* Aadhar Number Field */}
+<div className="space-y-2">
+  <label className="block text-sm font-medium text-[#170F49]">Aadhar Number</label>
+  <input
+    type="text"
+    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg..."
+    placeholder="Enter Aadhar number"
+    value={studentForm.aadhar_number}
+    onChange={handleFieldChange('aadhar_number')}
+  />
+</div>
                   </div>
                 </div>
 
-{/* Category Section */}
-<div className="mt-6">
+                {/* Category Section */}
+                <div className="mt-6">
                   <label className="block text-sm font-medium text-[#170F49] mb-2">Category</label>
                   <div className="grid grid-cols-4 gap-4">
                     {['SC', 'ST', 'OBC', 'OEC'].map((category) => (
@@ -566,8 +1638,10 @@ const [householdRows, setHouseholdRows] = useState([
                           name="category"
                           value={category}
                           className="peer absolute opacity-0"
+                          checked={studentForm.category === category}
+                          onChange={handleFieldChange('category')}
                         />
-                        <div className="flex items-center justify-center p-4 rounded-xl bg-white border-2 border-transparent cursor-pointer transition-all duration-300 hover:bg-white/90 peer-checked:bg-white peer-checked:border-[#6366f1] peer-checked:shadow-lg">
+                        <div className="flex items-center justify-center p-4 rounded-xl bg-white border-2 border-transparent cursor-pointer transition-all duration-300 hover:bg-white/90 peer-checked:bg-white peer-checked:border-[#E38B52] peer-checked:shadow-lg">
                           <span className="text-sm font-medium text-[#170F49]">{category}</span>
                         </div>
                       </label>
@@ -575,204 +1649,227 @@ const [householdRows, setHouseholdRows] = useState([
                   </div>
                 </div>
               </div>
+            )}
 
               {/* Demographic Data */}
-              <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#6366f1]/20 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#6366f1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  Demographic Data
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                  {/* Father's Information */}
-                  <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
-                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Father's Details</h3>
-                    <div className="space-y-6">
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Father's Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter father's name"
-                        />
-                      </div>
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Father's Education</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter father's education"
-                        />
-                      </div>
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Father's Occupation</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter father's occupation"
-                        />
-                      </div>
-                    </div>
+              {activeCaseSection === 'demographic' && (
+                <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                  <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    Demographic Data
+                  </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+              {/* Father's Information */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
+                <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Father's Details</h3>
+                <div className="space-y-6">
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Father's Name</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter father's name"
+                      value={studentForm.father_name}
+                      onChange={handleFieldChange('father_name')}
+                    />
                   </div>
-
-                  {/* Mother's Information */}
-                  <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
-                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Mother's Details</h3>
-                    <div className="space-y-6">
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Mother's Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter mother's name"
-                        />
-                      </div>
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Mother's Education</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter mother's education"
-                        />
-                      </div>
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Mother's Occupation</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter mother's occupation"
-                        />
-                      </div>
-                    </div>
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Father's Education</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter father's education"
+                      value={studentForm.father_education}
+                      onChange={handleFieldChange('father_education')}
+                    />
                   </div>
-
-                  {/* Guardian's Information */}
-                  <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
-                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Guardian's Details</h3>
-                    <div className="space-y-6">
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Guardian's Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter guardian's name"
-                        />
-                      </div>
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Guardian's Occupation</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter guardian's occupation"
-                        />
-                      </div>
-                      <div className="h-[85px]">
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Guardian's Relationship</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                          placeholder="Enter guardian's relationship"
-                        />
-                      </div>
-                    </div>
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Father's Occupation</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter father's occupation"
+                      value={studentForm.father_occupation}
+                      onChange={handleFieldChange('father_occupation')}
+                    />
                   </div>
-                </div>
-
-                {/* Additional Details */}
-                <div className="mt-12 bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Additional Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-3">
-                      <label className="block text-sm font-medium text-[#170F49] mb-3">Total Family Income per Month</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter family income"
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <label className="block text-sm font-medium text-[#170F49] mb-3">Duration of Contact</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                        placeholder="Enter duration of contact"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-{/* Contact & Medical Information */}
-                <div className="mt-10 space-y-8">
-                  {/* Contact Information */}
-                  <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
-                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Contact Information</h3>
-                    <div className="space-y-8">
-                      <div>
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">Address and Phone Number</label>
-                        <textarea
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                          rows="3"
-                          placeholder="Enter address and phone number"
-                        ></textarea>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">Informant's Name</label>
-                          <input
-                            type="text"
-                            className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                            placeholder="Enter informant's name"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">Informant's Relationship</label>
-                          <input
-                            type="text"
-                            className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                            placeholder="Enter informant's relationship"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Additional Contact Information */}
-                      <div className="space-y-6 mt-6">
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">Duration of Contact</label>
-                          <input
-                            type="text"
-                            className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
-                            placeholder="Enter duration of contact"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">Present Complaints</label>
-                          <textarea
-                            className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                            rows="3"
-                            placeholder="Enter present complaints"
-                          ></textarea>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">Previous Consultation and Treatments</label>
-                          <textarea
-                            className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                            rows="3"
-                            placeholder="Enter previous consultation and treatments"
-                          ></textarea>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-
                 </div>
               </div>
 
+              {/* Mother's Information */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
+                <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Mother's Details</h3>
+                <div className="space-y-6">
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Mother's Name</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter mother's name"
+                      value={studentForm.mother_name}
+                      onChange={handleFieldChange('mother_name')}
+                    />
+                  </div>
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Mother's Education</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter mother's education"
+                      value={studentForm.mother_education}
+                      onChange={handleFieldChange('mother_education')}
+                    />
+                  </div>
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Mother's Occupation</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter mother's occupation"
+                      value={studentForm.mother_occupation}
+                      onChange={handleFieldChange('mother_occupation')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Guardian's Information */}
+              <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
+                <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Guardian's Details</h3>
+                <div className="space-y-6">
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Guardian's Name</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter guardian's name"
+                      value={studentForm.guardian_name}
+                      onChange={handleFieldChange('guardian_name')}
+                    />
+                  </div>
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Guardian's Occupation</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter guardian's occupation"
+                      value={studentForm.guardian_occupation}
+                      onChange={handleFieldChange('guardian_occupation')}
+                    />
+                  </div>
+                  <div className="h-[85px]">
+                    <label className="block text-sm font-medium text-[#170F49] mb-2">Guardian's Relationship</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                      placeholder="Enter guardian's relationship"
+                      value={studentForm.guardian_relationship}
+                      onChange={handleFieldChange('guardian_relationship')}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Details */}
+            <div className="mt-12 bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8">
+              <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Additional Information</h3>
+              <div className="grid grid-cols-1 gap-8">
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-[#170F49] mb-3">Total Family Income per Month</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg..."
+                    placeholder="Enter family income"
+                    value={studentForm.total_family_income}
+                    onChange={handleFieldChange('total_family_income')}
+                  />
+                </div>
+                  </div>
+                </div>
+
+                {/* Present Complaints & Previous Treatments (moved to Contact Information) */}
+              </div>
+            )}          {/* Contact Information */}
+              {activeCaseSection === 'contact' && (
+          <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+            <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                </svg>
+                Contact Information
+            </h2>
+            {/* address_and_phone removed from Contact Information as requested */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 items-center">
+              <div>
+                <label className="block text-sm font-medium text-[#170F49] mb-2">Informant's Name</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                  placeholder="Enter informant's name"
+                  value={studentForm.informant_name}
+                  onChange={handleFieldChange('informant_name')}
+                />
+              </div>
+
+              <div>
+  <label className="block text-sm font-medium text-[#170F49] mb-2">Informant's Relationship</label>
+  <input
+    type="text"
+    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+    placeholder="Enter informant's relationship"
+    value={studentForm.informant_relationship}
+    onChange={handleFieldChange('informant_relationship')}
+  />
+</div>
+            </div>
+
+
+            <div className="grid grid-cols-1 gap-6 mt-6">
+              <div>
+                <label className="block text-sm font-medium text-[#170F49] mb-2">Duration of Contact</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                  placeholder="Enter duration of contact"
+                  value={studentForm.duration_of_contact}
+                  onChange={handleFieldChange('duration_of_contact')}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#170F49] mb-2">Present Complaints</label>
+                <textarea
+                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                  rows="3"
+                  placeholder="Enter present complaints"
+                  value={studentForm.present_complaints}
+                  onChange={handleFieldChange('present_complaints')}
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#170F49] mb-2">Previous Consultation and Treatments</label>
+                <textarea
+                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                  rows="3"
+                  placeholder="Enter previous consultation and treatments"
+                  value={studentForm.previous_treatments}
+                  onChange={handleFieldChange('previous_treatments')}
+                ></textarea>
+              </div>
+            </div>
+          </div>
+        )}
+
               {/* Family History Container */}
+              {activeCaseSection === 'family' && (
               <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#6366f1]/20 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#6366f1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   Family History
@@ -780,11 +1877,11 @@ const [householdRows, setHouseholdRows] = useState([
 
                 {/* Family Composition */}
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Household Composition</h3>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Household Composition</h3>
                   <div className="overflow-hidden">
-                    <table className="w-full border border-[#6366f1]/20 rounded-xl backdrop-blur-xl overflow-hidden">
+                    <table className="w-full border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
                       <thead>
-                        <tr className="border-b border-[#6366f1]/20">
+                        <tr className="border-b border-[#E38B52]/20">
                           <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">S.No</th>
                           <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">Name</th>
                           <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">Age</th>
@@ -796,7 +1893,7 @@ const [householdRows, setHouseholdRows] = useState([
                       </thead>
                       <tbody>
                         {householdRows.map((row) => (
-                          <tr key={row.id} className="border-b border-[#6366f1]/10">
+                          <tr key={row.id} className="border-b border-[#E38B52]/10">
                             <td className="px-4 py-3 text-sm text-[#170F49]">{row.id}</td>
                             <td className="px-4 py-3">
                               <input 
@@ -808,7 +1905,7 @@ const [householdRows, setHouseholdRows] = useState([
                                   );
                                   setHouseholdRows(updatedRows);
                                 }}
-                                className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -821,7 +1918,7 @@ const [householdRows, setHouseholdRows] = useState([
                                   );
                                   setHouseholdRows(updatedRows);
                                 }}
-                                className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -834,7 +1931,7 @@ const [householdRows, setHouseholdRows] = useState([
                                   );
                                   setHouseholdRows(updatedRows);
                                 }}
-                                className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -847,7 +1944,7 @@ const [householdRows, setHouseholdRows] = useState([
                                   );
                                   setHouseholdRows(updatedRows);
                                 }}
-                                className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -860,7 +1957,7 @@ const [householdRows, setHouseholdRows] = useState([
                                   );
                                   setHouseholdRows(updatedRows);
                                 }}
-                                className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -873,7 +1970,7 @@ const [householdRows, setHouseholdRows] = useState([
                                   );
                                   setHouseholdRows(updatedRows);
                                 }}
-                                className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                               />
                             </td>
                           </tr>
@@ -882,7 +1979,7 @@ const [householdRows, setHouseholdRows] = useState([
                     </table>
                     <button 
                       onClick={addHouseholdRow}
-                      className="mt-4 w-full px-4 py-3 bg-[#6366f1] text-white rounded-xl hover:bg-[#4f46e5] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                      className="mt-4 w-full px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
                     >
                       Add Row
                     </button>
@@ -891,10 +1988,10 @@ const [householdRows, setHouseholdRows] = useState([
 
                 {/* Pedigree Chart Upload */}
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Pedigree Chart</h3>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Pedigree Chart</h3>
                   <label 
                     htmlFor="pedigree-upload" 
-                    className="block w-full p-4 border-2 border-dashed border-[#6366f1] rounded-xl text-center cursor-pointer hover:bg-white/50 transition-all duration-200"
+                    className="block w-full p-4 border-2 border-dashed border-[#E38B52] rounded-xl text-center cursor-pointer hover:bg-white/50 transition-all duration-200"
                   >
                     <svg 
                       className="mx-auto mb-2" 
@@ -911,7 +2008,7 @@ const [householdRows, setHouseholdRows] = useState([
                       <polyline points="17 8 12 3 7 8"/>
                       <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
-                    <span className="text-[#6366f1] font-medium">Upload Pedigree Chart</span>
+                    <span className="text-[#E38B52] font-medium">Upload Pedigree Chart</span>
                     <span className="block text-sm text-[#6F6C90] mt-1">Supported formats: PDF, JPG, PNG</span>
                   </label>
                   <input type="file" id="pedigree-upload" className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
@@ -919,125 +2016,221 @@ const [householdRows, setHouseholdRows] = useState([
 
                 {/* Family History Fields */}
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Family Medical History</h3>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Family Medical History</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Family History of Mental Illness</label>
-                      <textarea
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                        rows="3"
-                        placeholder="Enter family history of mental illness"
-                      ></textarea>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Family History of Mental Retardation</label>
-                      <textarea
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                        rows="3"
-                        placeholder="Enter family history of mental retardation"
-                      ></textarea>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Family History of Epilepsy and Others</label>
-                      <textarea
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                        rows="3"
-                        placeholder="Enter family history of epilepsy and other conditions"
-                      ></textarea>
-                    </div>
-                  </div>
+  <div>
+    <label className="block text-sm font-medium text-[#170F49] mb-2">Family History of Mental Illness</label>
+    <textarea
+      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+      rows="3"
+      placeholder="Enter family history of mental illness"
+      value={studentForm.family_history_mental_illness}
+      onChange={handleFieldChange('family_history_mental_illness')}
+    ></textarea>
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-[#170F49] mb-2">Family History of Mental Retardation</label>
+    <textarea
+      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+      rows="3"
+      placeholder="Enter family history of mental retardation"
+      value={studentForm.family_history_mental_retardation}
+      onChange={handleFieldChange('family_history_mental_retardation')}
+    ></textarea>
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-[#170F49] mb-2">Family History of Epilepsy and Others</label>
+    <textarea
+      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+      rows="3"
+      placeholder="Enter family history of epilepsy and other conditions"
+      value={studentForm.family_history_epilepsy}
+      onChange={handleFieldChange('family_history_epilepsy')}
+    ></textarea>
+  </div>
+</div>
                 </div>
 
                 {/* Birth History Fields */}
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Birth History</h3>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Birth History</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Prenatal History</label>
-                      <textarea
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                        rows="3"
-                        placeholder="Enter prenatal history"
-                      ></textarea>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Natal and Neonatal</label>
-                      <textarea
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                        rows="3"
-                        placeholder="Enter natal and neonatal history"
-                      ></textarea>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#170F49] mb-2">Postnatal History</label>
-                      <textarea
-                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                        rows="3"
-                        placeholder="Enter postnatal history"
-                      ></textarea>
-                    </div>
-                  </div>
+  <div>
+    <label className="block text-sm font-medium text-[#170F49] mb-2">Prenatal History</label>
+    <textarea
+      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+      rows="3"
+      placeholder="Enter prenatal history"
+      value={studentForm.prenatal_history}
+      onChange={handleFieldChange('prenatal_history')}
+    ></textarea>
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-[#170F49] mb-2">Natal and Neonatal</label>
+    <textarea
+      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+      rows="3"
+      placeholder="Enter natal and neonatal history"
+      value={studentForm.natal_history}
+      onChange={handleFieldChange('natal_history')}
+    ></textarea>
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-[#170F49] mb-2">Postnatal History</label>
+    <textarea
+      className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+      rows="3"
+      placeholder="Enter postnatal history"
+      value={studentForm.postnatal_history}
+      onChange={handleFieldChange('postnatal_history')}
+    ></textarea>
+  </div>
+</div>
                 </div>
 
                 {/* Development History */}
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Development History</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-6 rounded-xl shadow-lg">
-                    {[
-                      "Smiles at other", "Head Control", "Sitting", "Responds to name",
-                      "Babbling", "First words", "Standing", "Walking",
-                      "Two word phrases", "Toilet control", "Sentences", "Physical Deformity"
-                    ].map((item) => (
-                      <label key={item} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded border-gray-300 text-[#6366f1] focus:ring-[#6366f1]"
-                        />
-                        <span className="text-sm text-[#170F49]">{item}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Developmental History</h3>
+                  {/* AFTER */}
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-6 rounded-xl shadow-lg">
+  {Object.entries(developmentHistoryMap).map(([label, field]) => (
+    <label key={field} className="flex items-center space-x-2">
+      <input
+        type="checkbox"
+        className="w-4 h-4 rounded border-gray-300 text-[#E38B52] focus:ring-[#E38B52]"
+        checked={!!studentForm[field]}
+        onChange={handleCheckboxChange(field)}
+      />
+      <span className="text-sm text-[#170F49]">{label}</span>
+    </label>
+  ))}
+</div>
                 </div>
+              </div>
+            )}
 
-                {/* Additional Information Fields */}
+              {/* Additional Information */}
+              {activeCaseSection === 'additional' && (
+              <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Additional Information
+                </h2>
+
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Additional Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[
-                      "School History",
-                      "Occupational History",
-                      "Behaviour Problems",
-                      "Special Educational Assessment",
-                      "Psychological Assessment",
-                      "Medical Examination",
-                      "Diagnosis",
-                      "Management Plan"
-                    ].map((field) => (
-                      <div key={field}>
-                        <label className="block text-sm font-medium text-[#170F49] mb-2">{field}</label>
-                        <textarea
-                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none"
-                          rows="3"
-                          placeholder={`Enter ${field.toLowerCase()}`}
-                        ></textarea>
-                      </div>
-                    ))}
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">School History</label>
+                      <textarea
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                        rows="3"
+                        placeholder="Enter school history"
+                        value={studentForm.school_history}
+                        onChange={handleFieldChange('school_history')}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Occupational History</label>
+                      <textarea
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                        rows="3"
+                        placeholder="Enter occupational history"
+                        value={studentForm.occupational_history}
+                        onChange={handleFieldChange('occupational_history')}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Behaviour Problems</label>
+                      <textarea
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                        rows="3"
+                        placeholder="Describe behaviour problems"
+                        value={studentForm.behaviour_problems}
+                        onChange={handleFieldChange('behaviour_problems')}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Special Education Assessment</label>
+                      <textarea
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                        rows="3"
+                        placeholder="Enter special education assessment"
+                        value={studentForm.special_education_assessment}
+                        onChange={handleFieldChange('special_education_assessment')}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Psychological Assessment</label>
+                      <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none" rows="3" placeholder="Enter psychological assessment" value={studentForm.psychological_assessment} onChange={handleFieldChange('psychological_assessment')}></textarea>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Medical Examination</label>
+                      <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none" rows="3" placeholder="Enter medical examination" value={studentForm.medical_examination} onChange={handleFieldChange('medical_examination')}></textarea>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Diagnosis</label>
+                      <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none" rows="3" placeholder="Enter diagnosis" value={studentForm.diagnosis} onChange={handleFieldChange('diagnosis')}></textarea>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#170F49] mb-2">Management Plan</label>
+                      <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none" rows="3" placeholder="Enter management plan" value={studentForm.management_plan} onChange={handleFieldChange('management_plan')}></textarea>
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
               {/* Special Education Assessment */}
+              {activeCaseSection === 'education' && (
               <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#6366f1]/20 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#6366f1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h2" />
                   </svg>
                   Special Education Assessment
                 </h2>
 
+                {/* Horizontal Navigation for Subsections */}
+                <div className="mb-8 overflow-x-auto">
+                  <div className="flex gap-2 min-w-max pb-2">
+                    {[
+                      { id: 'self-help', label: 'Self Help' },
+                      { id: 'motor', label: 'Motor' },
+                      { id: 'sensory', label: 'Sensory' },
+                      { id: 'socialization', label: 'Socialization' },
+                      { id: 'cognitive', label: 'Cognitive' },
+                      { id: 'academic', label: 'Academic' },
+                      { id: 'prevocational', label: 'Prevocational' },
+                      { id: 'other-info', label: 'Other Info' }
+                    ].map((subsection) => (
+                      <button
+                        key={subsection.id}
+                        onClick={() => setActiveEducationSubsection(subsection.id)}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap ${
+                          activeEducationSubsection === subsection.id
+                            ? 'bg-[#E38B52] text-white shadow-lg'
+                            : 'bg-white/50 text-[#170F49] hover:bg-white/80'
+                        }`}
+                      >
+                        {subsection.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Self Help */}
+                {activeEducationSubsection === 'self-help' && (
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Self Help</h3>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Self Help</h3>
                   
                   {/* Food Habits */}
                   <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
@@ -1045,11 +2238,23 @@ const [householdRows, setHouseholdRows] = useState([
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Eating</label>
-                        <input type="text" placeholder="Describe eating habits and capabilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input
+                          type="text"
+                          placeholder="Describe eating habits and capabilities"
+                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                          value={studentForm.eating_habits}
+                          onChange={handleFieldChange('eating_habits')}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Drinking</label>
-                        <input type="text" placeholder="Describe drinking habits and capabilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input
+                          type="text"
+                          placeholder="Describe drinking habits and capabilities"
+                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                          value={studentForm.drinking_habits}
+                          onChange={handleFieldChange('drinking_habits')}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1057,15 +2262,33 @@ const [householdRows, setHouseholdRows] = useState([
                   <div className="space-y-6">
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Toilet Habits (Include mention hygenic where applicable)</label>
-                      <input type="text" placeholder="Describe toilet habits and hygiene practices" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input
+                        type="text"
+                        placeholder="Describe toilet habits and hygiene practices"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        value={studentForm.toilet_habits}
+                        onChange={handleFieldChange('toilet_habits')}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Brushing</label>
-                      <input type="text" placeholder="Describe brushing capabilities and routine" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input
+                        type="text"
+                        placeholder="Describe brushing capabilities and routine"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        value={studentForm.brushing}
+                        onChange={handleFieldChange('brushing')}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Bathing</label>
-                      <input type="text" placeholder="Describe bathing capabilities and habits" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input
+                        type="text"
+                        placeholder="Describe bathing capabilities and habits"
+                        className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                        value={studentForm.bathing}
+                        onChange={handleFieldChange('bathing')}
+                      />
                     </div>
                   </div>
 
@@ -1075,89 +2298,97 @@ const [householdRows, setHouseholdRows] = useState([
                     <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Removing and wearing clothes</label>
-                        <input type="text" placeholder="Describe ability to remove and wear clothes independently" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe ability to remove and wear clothes independently" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.dressing_removing_wearing} onChange={handleFieldChange('dressing_removing_wearing')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Unbuttoning and Buttoning</label>
-                        <input type="text" placeholder="Describe ability to handle buttons independently" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe ability to handle buttons independently" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.dressing_buttoning} onChange={handleFieldChange('dressing_buttoning')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">wearing shoes/Slippers</label>
-                        <input type="text" placeholder="Describe ability to wear footwear independently" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe ability to wear footwear independently" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.dressing_footwear} onChange={handleFieldChange('dressing_footwear')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Grooming (include shaving skills where applicable)</label>
-                        <input type="text" placeholder="Describe grooming abilities including shaving if applicable" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe grooming abilities including shaving if applicable" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.dressing_grooming} onChange={handleFieldChange('dressing_grooming')} />
                       </div>
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Motor */}
+                {activeEducationSubsection === 'motor' && (
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Motor</h3>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Motor</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white rounded-xl p-6 shadow-lg">
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Gross Motor</label>
-                      <input type="text" placeholder="Describe capabilities in large movements, balance, and coordination" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe capabilities in large movements, balance, and coordination" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.gross_motor} onChange={handleFieldChange('gross_motor')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Fine Motor</label>
-                      <input type="text" placeholder="Describe capabilities in small, precise movements" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe capabilities in small, precise movements" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.fine_motor} onChange={handleFieldChange('fine_motor')} />
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Sensory */}
+                {activeEducationSubsection === 'sensory' && (
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
                   <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Sensory</h3>
                   <div className="bg-white rounded-xl p-6 shadow-lg">
-                    <input type="text" placeholder="Describe sensory responses and processing capabilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                    <input type="text" placeholder="Describe sensory responses and processing capabilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.sensory} onChange={handleFieldChange('sensory')} />
                   </div>
                 </div>
+                )}
 
                 {/* Socialization */}
+                {activeEducationSubsection === 'socialization' && (
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
                   <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Socialization</h3>
                   <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Language/Communication</label>
-                      <input type="text" placeholder="Describe communication abilities and language skills" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe communication abilities and language skills" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.language_communication} onChange={handleFieldChange('language_communication')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Social behaviour</label>
-                      <input type="text" placeholder="Describe interactions with others and social adaptability" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe interactions with others and social adaptability" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.social_behaviour} onChange={handleFieldChange('social_behaviour')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Mobility in the nieghborhood</label>
-                      <input type="text" placeholder="Describe ability to navigate and move around in familiar areas" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe ability to navigate and move around in familiar areas" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.mobility_in_neighborhood} onChange={handleFieldChange('mobility_in_neighborhood')} />
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Cognitive */}
+                {activeEducationSubsection === 'cognitive' && (
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
                   <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Cognitive</h3>
                   <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Attention</label>
-                      <input type="text" placeholder="Describe attention span and focus capabilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe attention span and focus capabilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.attention} onChange={handleFieldChange('attention')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Identification of familiar objects</label>
-                      <input type="text" placeholder="Describe ability to recognize and name common objects" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe ability to recognize and name common objects" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.identification_of_objects} onChange={handleFieldChange('identification_of_objects')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Use of familiar objects</label>
-                      <input type="text" placeholder="Describe ability to appropriately use common objects" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe ability to appropriately use common objects" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.use_of_objects} onChange={handleFieldChange('use_of_objects')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Following simple instruction</label>
-                      <input type="text" placeholder="Describe ability to understand and follow basic instructions" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe ability to understand and follow basic instructions" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.following_instruction} onChange={handleFieldChange('following_instruction')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Awareness of dangrer and hazards</label>
-                      <input type="text" placeholder="Describe understanding of dangerous situations" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="Describe understanding of dangerous situations" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.awareness_of_danger} onChange={handleFieldChange('awareness_of_danger')} />
                     </div>
                   </div>
 
@@ -1167,94 +2398,104 @@ const [householdRows, setHouseholdRows] = useState([
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Color</label>
-                        <input type="text" placeholder="Describe ability to recognize and match colors" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe ability to recognize and match colors" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.concept_color} onChange={handleFieldChange('concept_color')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Size</label>
-                        <input type="text" placeholder="Describe understanding of size concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe understanding of size concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.concept_size} onChange={handleFieldChange('concept_size')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Sex</label>
-                        <input type="text" placeholder="Describe understanding of gender concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe understanding of gender concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.concept_sex} onChange={handleFieldChange('concept_sex')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Shape</label>
-                        <input type="text" placeholder="Describe ability to recognize and name shapes" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe ability to recognize and name shapes" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.concept_shape} onChange={handleFieldChange('concept_shape')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Number</label>
-                        <input type="text" placeholder="Describe understanding of numbers and counting" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe understanding of numbers and counting" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.concept_number} onChange={handleFieldChange('concept_number')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Time</label>
-                        <input type="text" placeholder="Describe understanding of time concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe understanding of time concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.concept_time} onChange={handleFieldChange('concept_time')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Money</label>
-                        <input type="text" placeholder="Describe understanding of money concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe understanding of money concepts" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.concept_money} onChange={handleFieldChange('concept_money')} />
                       </div>
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Academic */}
+                {activeEducationSubsection === 'academic' && (
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
                   <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Academic (give brief history: class attended/attending indicate class/grade/level wherever appropriate)</h3>
                   <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Reading</label>
-                      <input type="text" placeholder="Describe reading level and comprehension" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe reading level and comprehension" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.academic_reading} onChange={handleFieldChange('academic_reading')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Writing</label>
-                      <input type="text" placeholder="Describe writing abilities and skills" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe writing abilities and skills" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.academic_writing} onChange={handleFieldChange('academic_writing')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Arithmetic</label>
-                      <input type="text" placeholder="Describe mathematical understanding and abilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Describe mathematical understanding and abilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.academic_arithmetic} onChange={handleFieldChange('academic_arithmetic')} />
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Prevocational/Domestic */}
+                {activeEducationSubsection === 'prevocational' && (
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Prevocational/Domestic (Specify ability and interest)</h3>
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Prevocational/Domestic (Specify ability and interest)</h3>
                   <div className="bg-white rounded-xl p-6 shadow-lg">
-                    <input type="text" placeholder="Describe prevocational skills and domestic abilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                    <input type="text" placeholder="Describe prevocational skills and domestic abilities" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.prevocational_ability} onChange={handleFieldChange('prevocational_ability')} />
                   </div>
                   <div className="space-y-6">
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Items of interest</label>
-                      <input type="text" placeholder="List activities and objects that interest the student" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="List activities and objects that interest the student" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.prevocational_interest} onChange={handleFieldChange('prevocational_interest')} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Items of dislike</label>
-                      <input type="text" placeholder="List activities and objects that the student dislikes" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                      <input type="text" placeholder="List activities and objects that the student dislikes" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" value={studentForm.prevocational_dislike} onChange={handleFieldChange('prevocational_dislike')} />
                     </div>
                   </div>
                 </div>
+                )}
 
-                {/* Additional Fields */}
-                <div className="space-y-6">
+                {/* Other Info */}
+                {activeEducationSubsection === 'other-info' && (
+                <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6 mb-8">
+                  <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Additional Information</h3>
                   <div>
                     <label className="block text-sm font-medium text-[#170F49] mb-2">Any peculiar behaviour/behaviour problems observed</label>
-                    <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" rows="4" placeholder="Describe any unusual behaviors or behavioral concerns observed"></textarea>
+                    <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" rows="4" placeholder="Describe any unusual behaviors or behavioral concerns observed" value={studentForm.any_peculiar_behaviour} onChange={handleFieldChange('any_peculiar_behaviour')}></textarea>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#170F49] mb-2">Any other</label>
-                    <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" rows="4" placeholder="Add any additional observations or comments"></textarea>
+                    <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" rows="4" placeholder="Add any additional observations or comments" value={studentForm.any_other} onChange={handleFieldChange('any_other')}></textarea>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#170F49] mb-2">Recommendation</label>
-                    <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" rows="4" placeholder="Provide detailed recommendations for support and intervention"></textarea>
+                    <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" rows="4" placeholder="Provide detailed recommendations for support and intervention" value={studentForm.recommendation} onChange={handleFieldChange('recommendation')}></textarea>
                   </div>
                 </div>
+                )}
               </div>
+              )}
 
               {/* Medical Information Container */}
+              {activeCaseSection === 'medical' && (
               <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#6366f1]/20 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#6366f1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
                   Medical Information
@@ -1263,50 +2504,59 @@ const [householdRows, setHouseholdRows] = useState([
                 {/* Medical History */}
                 <div className="space-y-8">
                   <div>
-                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Medical History</h3>
+                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Medical History</h3>
                     <div className="mt-6 space-y-6">
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Any specific diagnostic</label>
-                        <input type="text" placeholder="Enter specific diagnostic details" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Enter specific diagnostic details" value={studentForm.specific_diagnostic} onChange={handleFieldChange('specific_diagnostic')} className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" />
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {[
-                          'History of fits (seizures)',
-                          'History of Recent Surgery',
-                          'History of Bleeding Disorders',
-                          'Using spectables/dentures/hearing aid'
-                        ].map((item) => (
-                          <label key={item} className="flex items-center space-x-3 bg-white p-4 rounded-xl border shadow-lg hover:shadow-xl">
-                            <input
-                              type="checkbox"
-                              className="w-4 h-4 rounded border-gray-300 text-[#6366f1] focus:ring-[#6366f1]"
-                            />
-                            <span className="text-sm text-[#170F49]">{item}</span>
-                          </label>
-                        ))}
-                      </div>
+                     {/* AFTER */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {[
+    'History of fits (seizures)',
+    'History of Recent Surgery',
+    'History of Bleeding Disorders',
+    'Using spectables/dentures/hearing aid'
+  ].map((item) => (
+    <label key={item} className="flex items-center space-x-3 bg-white p-4 rounded-xl border shadow-lg hover:[#E38B52]">
+      <input
+        type="checkbox"
+        className="w-4 h-4 rounded border-gray-300 text-[#E38B52] focus:ring-[#E38B52]"
+        checked={studentForm.medical_conditions?.includes(item) || false}
+        onChange={handleMedicalConditionsChange(item)}
+      />
+      <span className="text-sm text-[#170F49]">{item}</span>
+    </label>
+  ))}
+</div>
 
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Any other relevant Medical Information</label>
-                        <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300 resize-none" rows="3" placeholder="Enter other relevant medical information"></textarea>
+                        <textarea className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none" rows="3" placeholder="Enter other relevant medical information" value={studentForm.medical_examination} onChange={handleFieldChange('medical_examination')}></textarea>
                       </div>
                     </div>
                   </div>
 
                   {/* Drug History */}
                   <div>
-                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Drug History</h3>
+                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Drug History</h3>
                     <div className="mt-6 space-y-6">
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Is the child on regular drugs</label>
-                        <input type="text" placeholder="Enter details about regular medication" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input
+                          type="text"
+                          placeholder="Yes / No or details"
+                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                          value={studentForm.is_on_regular_drugs}
+                          onChange={handleFieldChange('is_on_regular_drugs')}
+                        />
                       </div>
 
                       <div className="overflow-hidden">
-                          <table className="w-full border border-[#6366f1]/20 rounded-xl backdrop-blur-xl overflow-hidden">
+                          <table className="w-full border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
                             <thead>
-                              <tr className="border-b border-[#6366f1]/20">
+                              <tr className="border-b border-[#E38B52]/20">
                                 <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">S.No</th>
                                 <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">Name of drug</th>
                                 <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">Dose if known</th>
@@ -1314,7 +2564,7 @@ const [householdRows, setHouseholdRows] = useState([
                             </thead>
                           <tbody>
                             {drugRows.map((row) => (
-                              <tr key={row.id} className="border-b border-[#6366f1]/10">
+                              <tr key={row.id} className="border-b border-[#E38B52]/10">
                                 <td className="px-4 py-3 text-sm text-[#170F49]">{row.id}</td>
                                 <td className="px-4 py-3">
                                   <input 
@@ -1326,7 +2576,7 @@ const [householdRows, setHouseholdRows] = useState([
                                       );
                                       setDrugRows(updatedRows);
                                     }}
-                                    className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                    className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                                     placeholder="Enter drug name"
                                   />
                                 </td>
@@ -1340,7 +2590,7 @@ const [householdRows, setHouseholdRows] = useState([
                                       );
                                       setDrugRows(updatedRows);
                                     }}
-                                    className="w-full px-3 py-2 bg-white/50 border border-[#6366f1]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300"
+                                    className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                                     placeholder="Enter dose"
                                   />
                                 </td>
@@ -1350,7 +2600,7 @@ const [householdRows, setHouseholdRows] = useState([
                         </table>
                         <button 
                           onClick={addDrugRow}
-                          className="mt-4 w-full px-4 py-3 bg-[#6366f1] text-white rounded-xl hover:bg-[#4f46e5] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                          className="mt-4 w-full px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
                         >
                           Add Drug
                         </button>
@@ -1360,39 +2610,51 @@ const [householdRows, setHouseholdRows] = useState([
 
                   {/* Allergies */}
                   <div>
-                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">Allergies</h3>
+                    <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">Allergies</h3>
                     <div className="mt-6 space-y-6">
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Allergies if any</label>
-                        <input type="text" placeholder="Enter allergies" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input
+                          type="text"
+                          placeholder="Enter allergies"
+                          className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                          value={studentForm.allergies}
+                          onChange={handleFieldChange('allergies')}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Drug Allergy</label>
-                        <input type="text" placeholder="Enter drug allergies" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Enter drug allergies" value={studentForm.drug_allergy} onChange={handleFieldChange('drug_allergy')} className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#170F49] mb-2">Food Allergy</label>
-                        <input type="text" placeholder="Enter food allergies" className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all duration-300" />
+                        <input type="text" placeholder="Enter food allergies" value={studentForm.food_allergy} onChange={handleFieldChange('food_allergy')} className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300" />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
+          </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-between w-full mt-8">
-            <button className="w-[48%] px-6 py-3 bg-[#6366f1] text-white rounded-xl hover:bg-[#4f46e5] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105">
-              Save Student
-            </button>
+          <div className="flex justify-between w-full mt-8">
             <button
-              onClick={() => navigate(-1)}
-              className="w-[48%] px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105"
+              onClick={handleSaveAll}
+              disabled={isSaving || !studentForm.name}
+              className={`w-[48%] px-6 py-3 ${isSaving ? 'bg-gray-400' : 'bg-[#E38B52]'} text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105`}
             >
-              Cancel
+              {isSaving ? 'Saving...' : 'Save Student & Case Record'}
             </button>
-          </div>
+            <button
+              onClick={() => navigate(-1)}
+              className="w-[48%] px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1452,7 +2714,12 @@ const [householdRows, setHouseholdRows] = useState([
           --ty: 15px;
           animation: float-particle 5s infinite ease-in-out;
         }
-      `}</style>
+     `}</style>
+      
+      {/* ++ ADD THIS LINE HERE ++ */}
+    
+      <DynamicScrollButtons /> 
+
     </div>
   );
 };

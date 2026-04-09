@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { validateTeacher, formatAadhaar, cleanAadhaar } from '../utils/validation';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
 const AddTeacher = () => {
   const navigate = useNavigate();
@@ -18,28 +21,156 @@ const AddTeacher = () => {
     rci_renewal_date: "",
     qualifications_details: "",
     category: "",
+    email: "",
+  });
+  const [aadharError, setAadharError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [defaultPassword, setDefaultPassword] = useState('');
+
+  const [classAssignment, setClassAssignment] = useState({
+    class: "",
+    year: new Date().getFullYear().toString()
   });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    // Special handling for Aadhaar: allow typing with spaces, keep only digits, format in groups of 4
+    if (name === 'aadhar_number') {
+      const raw = String(value || '');
+      const digits = raw.replace(/\D/g, '').slice(0, 12);
+      const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+      setTeacherData({ ...teacherData, [name]: formatted });
+
+      if (digits.length === 0) {
+        setAadharError('');
+      } else if (digits.length !== 12) {
+        setAadharError('Aadhaar must be exactly 12 digits.');
+      } else if (!/^[2-9]\d{11}$/.test(digits)) {
+        setAadharError('Aadhaar must start with a digit between 2 and 9.');
+      } else {
+        setAadharError('');
+      }
+      return;
+    }
+
     setTeacherData({ ...teacherData, [name]: value });
+  };
+
+  const handleClassAssignmentChange = (field, value) => {
+    setClassAssignment({ ...classAssignment, [field]: value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:8000/api/v1/teachers/', teacherData);
-      navigate('/headmaster');
+      setErrors({});
+      setIsSubmitting(true);
+
+      // Validate class assignment
+      if (!classAssignment.class) {
+        alert('Please select a class assignment.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate teacher data
+      if (!teacherData.name || !teacherData.address || !teacherData.date_of_birth || !teacherData.gender || !teacherData.blood_group || !teacherData.mobile_number || !teacherData.aadhar_number || !teacherData.religion || !teacherData.caste || !teacherData.rci_number || !teacherData.rci_renewal_date || !teacherData.qualifications_details || !teacherData.category || !teacherData.email) {
+        alert('Please fill in all required fields.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Clean Aadhaar before sending (remove spaces)
+      const cleanedAadhaar = teacherData.aadhar_number ? String(cleanAadhaar(teacherData.aadhar_number)) : '';
+
+      const teacherDataWithAssignments = {
+        ...teacherData,
+        aadhar_number: cleanedAadhaar || null,
+        class_assignments: [classAssignment]
+      };
+
+      // Create teacher
+      const teacherResponse = await axios.post(`${API_BASE_URL}/api/v1/teachers/`, teacherDataWithAssignments);
+      const teacherId = teacherResponse.data.id;
+
+      // Generate default password: Teacher + last 4 digits of Aadhaar or random
+      const lastFourAadhaar = cleanedAadhaar ? cleanedAadhaar.slice(-4) : Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const generatedPassword = `Teacher${lastFourAadhaar}`;
+      
+      // Create user account
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post(`${API_BASE_URL}/api/v1/users/`, {
+          username: teacherData.email.split('@')[0],
+          email: teacherData.email,
+          password: generatedPassword,
+          role: 'teacher',
+          is_active: true,
+          is_superuser: false
+        }, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+      } catch (userError) {
+        console.warn('User creation warning:', userError);
+        // Continue anyway - teacher was created
+      }
+
+      setDefaultPassword(generatedPassword);
+      setShowSuccessModal(true);
+      
+      // Auto-redirect after 60 seconds (1 minute)
+      setTimeout(() => {
+        navigate('/headmaster');
+      }, 60000);
     } catch (error) {
       console.error('Error adding teacher:', error);
+      setIsSubmitting(false);
       alert('Error adding teacher. Please try again.');
     }
   };
 
-  const selectClassName = `w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all appearance-none text-[#6F6C90] bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23170F49%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[center_right_1rem] bg-no-repeat pr-10`;
+  const selectClassName = `w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all appearance-none text-[#6F6C90] bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23170F49%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[center_right_1rem] bg-no-repeat pr-10`;
+
+  const inputEditStyles = `
+    .input-edit {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background-color: #f9fafb;
+      font-size: 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-edit:focus {
+      outline: none;
+      border-color: #E38B52;
+      box-shadow: 0 0 0 3px rgba(227, 139, 82, 0.1);
+      background-color: white;
+    }
+    textarea.input-edit {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    /* Ensure checkbox checkmark/accent color matches Add Student (use accent-color) */
+    .add-teacher-root input[type="checkbox"] {
+      accent-color: #E38B52;
+      -webkit-accent-color: #E38B52;
+    }
+  `;
+
+  // inject styles to document head if not already injected
+  if (typeof document !== 'undefined' && !document.getElementById('ssm-input-edit-styles')) {
+    const styleElement = document.createElement('style');
+    styleElement.id = 'ssm-input-edit-styles';
+    styleElement.textContent = inputEditStyles;
+    document.head.appendChild(styleElement);
+  }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20">
+    <div className="add-teacher-root min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20">
       {/* Back button */}
       <button
         onClick={() => window.history.back()}
@@ -61,10 +192,10 @@ const AddTeacher = () => {
       </button>
 
       {/* Animated background blobs */}
-      <div className="absolute top-0 -left-40 w-[600px] h-[500px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float z-0" />
-      <div className="absolute -bottom-32 right-40 w-[600px] h-[600px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000 z-0" />
-      <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
-      <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000 z-0" />
+      <div className="absolute top-0 -left-40 w-[600px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float z-0" />
+      <div className="absolute -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000 z-0" />
+      <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
+      <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000 z-0" />
       
       <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col justify-center">
         <h1 className="text-3xl font-bold text-[#170F49] mb-8 text-center font-baskervville">
@@ -81,12 +212,14 @@ const AddTeacher = () => {
               <input
                 type="text"
                 name="name"
+                id="name"
                 value={teacherData.name}
                 onChange={handleInputChange}
                 placeholder="Enter Name"
-                className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
+                className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
                 required
               />
+              {errors.name && (<p className="text-red-500 text-xs mt-1">{errors.name}</p>)}
             </div>
 
             <div className="space-y-2 w-full">
@@ -95,12 +228,14 @@ const AddTeacher = () => {
               </label>
               <textarea
                 name="address"
+                id="address"
                 value={teacherData.address}
                 onChange={handleInputChange}
                 placeholder="Enter Address"
-                className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90] min-h-[100px]"
+                className="input-edit"
                 required
               />
+              {errors.address && (<p className="text-red-500 text-xs mt-1">{errors.address}</p>)}
             </div>
 
             <div className="flex gap-4">
@@ -111,11 +246,13 @@ const AddTeacher = () => {
                 <input
                   type="date"
                   name="date_of_birth"
+                  id="date_of_birth"
                   value={teacherData.date_of_birth}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all text-[#6F6C90]"
+                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all text-[#6F6C90]"
                   required
                 />
+                {errors.date_of_birth && (<p className="text-red-500 text-xs mt-1">{errors.date_of_birth}</p>)}
               </div>
               <div className="flex-1 space-y-2">
                 <label className="block text-sm font-medium text-[#170F49] ml-4">
@@ -123,6 +260,7 @@ const AddTeacher = () => {
                 </label>
                 <select
                   name="gender"
+                  id="gender"
                   value={teacherData.gender}
                   onChange={handleInputChange}
                   className={selectClassName}
@@ -133,6 +271,7 @@ const AddTeacher = () => {
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
                 </select>
+                {errors.gender && (<p className="text-red-500 text-xs mt-1">{errors.gender}</p>)}
               </div>
             </div>
 
@@ -143,6 +282,7 @@ const AddTeacher = () => {
                 </label>
                 <select
                   name="blood_group"
+                  id="blood_group"
                   value={teacherData.blood_group}
                   onChange={handleInputChange}
                   className={selectClassName}
@@ -158,6 +298,7 @@ const AddTeacher = () => {
                   <option value="O+">O+</option>
                   <option value="O-">O-</option>
                 </select>
+                {errors.blood_group && (<p className="text-red-500 text-xs mt-1">{errors.blood_group}</p>)}
               </div>
               <div className="flex-1 space-y-2">
                 <label className="block text-sm font-medium text-[#170F49] ml-4">
@@ -166,13 +307,34 @@ const AddTeacher = () => {
                 <input
                   type="tel"
                   name="mobile_number"
+                  id="mobile_number"
                   value={teacherData.mobile_number}
                   onChange={handleInputChange}
                   placeholder="Enter Mobile Number"
-                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
+                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
                   required
                 />
+                {errors.mobile_number && (<p className="text-red-500 text-xs mt-1">{errors.mobile_number}</p>)}
               </div>
+            </div>
+            <div className="space-y-2 w-full">
+              <label className="block text-sm font-medium text-[#170F49] ml-4">
+                Email
+              </label>
+              <input
+                type="email"
+                name="email"
+                id="email"
+                value={teacherData.email}
+                onChange={handleInputChange}
+                placeholder="Enter Email"
+                className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
+                required
+                pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
+                onInvalid={e => e.target.setCustomValidity('Please enter a valid email address (username@domain.extension) with no spaces.')}
+                onInput={e => e.target.setCustomValidity('')}
+              />
+              {errors.email && (<p className="text-red-500 text-xs mt-1">{errors.email}</p>)}
             </div>
 
             <div className="space-y-2 w-full">
@@ -182,12 +344,18 @@ const AddTeacher = () => {
               <input
                 type="text"
                 name="aadhar_number"
+                id="aadhar_number"
                 value={teacherData.aadhar_number}
                 onChange={handleInputChange}
-                placeholder="Enter Aadhar Number"
+                inputMode="numeric"
+                pattern="\d{4}\s?\d{4}\s?\d{4}"
+                maxLength={14}
+                placeholder="1234 5678 9012"
                 className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
                 required
               />
+              {aadharError && <p className="text-red-500 text-xs mt-1">{aadharError}</p>}
+              {errors.aadhar_number && !aadharError && (<p className="text-red-500 text-xs mt-1">{errors.aadhar_number}</p>)}
             </div>
 
             <div className="flex gap-4">
@@ -195,15 +363,21 @@ const AddTeacher = () => {
                 <label className="block text-sm font-medium text-[#170F49] ml-4">
                   Religion
                 </label>
-                <input
-                  type="text"
+                <select
                   name="religion"
                   value={teacherData.religion}
                   onChange={handleInputChange}
-                  placeholder="Enter Religion"
-                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
+                  className={selectClassName}
                   required
-                />
+                >
+                  <option value="">Select Religion</option>
+                  <option value="Hindu">Hindu</option>
+                  <option value="Christian">Christian</option>
+                  <option value="Muslim">Muslim</option>
+                  <option value="Sikh">Sikh</option>
+                  <option value="Jew">Jew</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
               <div className="flex-1 space-y-2">
                 <label className="block text-sm font-medium text-[#170F49] ml-4">
@@ -215,7 +389,7 @@ const AddTeacher = () => {
                   value={teacherData.caste}
                   onChange={handleInputChange}
                   placeholder="Enter Caste"
-                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
+                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
                   required
                 />
               </div>
@@ -229,12 +403,14 @@ const AddTeacher = () => {
                 <input
                   type="text"
                   name="rci_number"
+                  id="rci_number"
                   value={teacherData.rci_number}
                   onChange={handleInputChange}
                   placeholder="Enter RCI Number"
-                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
+                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
                   required
                 />
+                {errors.rci_number && (<p className="text-red-500 text-xs mt-1">{errors.rci_number}</p>)}
               </div>
               <div className="flex-1 space-y-2">
                 <label className="block text-sm font-medium text-[#170F49] ml-4">
@@ -243,11 +419,13 @@ const AddTeacher = () => {
                 <input
                   type="date"
                   name="rci_renewal_date"
+                  id="rci_renewal_date"
                   value={teacherData.rci_renewal_date}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all text-[#6F6C90]"
+                  className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all text-[#6F6C90]"
                   required
                 />
+                {errors.rci_renewal_date && (<p className="text-red-500 text-xs mt-1">{errors.rci_renewal_date}</p>)}
               </div>
             </div>
 
@@ -257,12 +435,14 @@ const AddTeacher = () => {
               </label>
               <textarea
                 name="qualifications_details"
+                id="qualifications_details"
                 value={teacherData.qualifications_details}
                 onChange={handleInputChange}
                 placeholder="Enter Qualifications Details"
-                className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90] min-h-[100px]"
+                className="input-edit"
                 required
               />
+              {errors.qualifications_details && (<p className="text-red-500 text-xs mt-1">{errors.qualifications_details}</p>)}
             </div>
 
             <div className="space-y-2 w-full">
@@ -271,6 +451,7 @@ const AddTeacher = () => {
               </label>
               <select
                 name="category"
+                id="category"
                 value={teacherData.category}
                 onChange={handleInputChange}
                 className={selectClassName}
@@ -283,18 +464,113 @@ const AddTeacher = () => {
                 <option value="ST">ST</option>
                 <option value="Other">Other</option>
               </select>
+              {errors.category && (<p className="text-red-500 text-xs mt-1">{errors.category}</p>)}
+            </div>
+
+            {/* Class Assignment Section */}
+            <div className="space-y-6 w-full">
+              <h2 className="text-xl font-semibold text-[#170F49] border-b pb-2">
+                Class Assignment
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-[#170F49] ml-4">
+                    Class <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="class_assignment_class"
+                    value={classAssignment.class}
+                    onChange={(e) => handleClassAssignmentChange('class', e.target.value)}
+                    className={selectClassName}
+                    required
+                  >
+                    <option value="">Select Class</option>
+                    <option value="PrePrimary">PrePrimary</option>
+                    <option value="Primary 1">Primary 1</option>
+                    <option value="Primary 2">Primary 2</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Pre vocational 1">Pre vocational 1</option>
+                    <option value="Pre vocational 2">Pre vocational 2</option>
+                    <option value="Care group below 18 years">Care group below 18 years</option>
+                    <option value="Care group Above 18 years">Care group Above 18 years</option>
+                    <option value="Vocational 18-35 years">Vocational 18-35 years</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-[#170F49] ml-4">
+                    Year <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="class_assignment_year"
+                    value={classAssignment.year}
+                    onChange={(e) => handleClassAssignmentChange('year', e.target.value)}
+                    className={selectClassName}
+                    required
+                  >
+                    <option value={new Date().getFullYear().toString()}>{new Date().getFullYear()}</option>
+                    {[...Array(5)].map((_, i) => {
+                      const year = new Date().getFullYear() - i - 1;
+                      return <option key={year} value={year.toString()}>{year}</option>
+                    })}
+                    {[...Array(5)].map((_, i) => {
+                      const year = new Date().getFullYear() + i + 1;
+                      return <option key={year} value={year.toString()}>{year}</option>
+                    })}
+                  </select>
+                </div>
+              </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-[#6366f1] text-white py-4 rounded-2xl hover:bg-[#4f46e5] hover:-translate-y-1 transition-all duration-200 font-medium 
+              disabled={isSubmitting}
+              className="w-full bg-[#E38B52] text-white py-4 rounded-2xl hover:bg-[#C8742F] hover:-translate-y-1 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed
               shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
             >
-              Add Teacher
+              {isSubmitting ? 'Adding Teacher...' : 'Add Teacher'}
             </button>
           </form>
         </div>
       </div>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-[#170F49] mb-3">Teacher Added Successfully!</h3>
+              <p className="text-gray-600 mb-4">A user account has been created for the teacher to login.</p>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-left">
+                <p className="text-sm font-medium text-[#170F49] mb-2">Login Credentials:</p>
+                <p className="text-sm text-gray-700 mb-1">
+                  <span className="font-medium">Username:</span> {teacherData.email.split('@')[0]}
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                  <span className="font-medium">Password:</span> <code className="bg-white px-2 py-1 rounded border border-gray-300 font-mono">{defaultPassword}</code>
+                </p>
+                <p className="text-xs text-gray-500">The teacher can change this password after login.</p>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-4">Redirecting to HeadMaster in 60 seconds...</p>
+              
+              <button
+                onClick={() => navigate('/headmaster')}
+                className="w-full px-6 py-2 bg-[#E38B52] text-white rounded-lg hover:bg-[#C8742F] font-medium transition-all"
+              >
+                Go to HeadMaster Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global styles for animations */}
       <style jsx global>{`

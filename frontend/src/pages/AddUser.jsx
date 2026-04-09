@@ -2,18 +2,41 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+
 const AddUser = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
-    password: ""
+    password: "",
+    role: "teacher",
+    aadhar_number: ""
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [aadharError, setAadharError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'aadhar_number') {
+      const raw = String(value || '');
+      const digits = raw.replace(/\D/g, '').slice(0, 12);
+      const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+      setFormData({ ...formData, [name]: formatted });
+
+      if (digits.length === 0) {
+        setAadharError('');
+      } else if (digits.length !== 12) {
+        setAadharError('Aadhaar must be exactly 12 digits.');
+      } else if (!/^[2-9]\d{11}$/.test(digits)) {
+        setAadharError('Aadhaar must start with a digit between 2 and 9.');
+      } else {
+        setAadharError('');
+      }
+      return;
+    }
+
     setFormData({
       ...formData,
       [name]: value
@@ -33,9 +56,17 @@ const AddUser = () => {
         return;
       }
 
+      const payload = { ...formData };
+      // Clean Aadhaar before sending (remove spaces). If empty, remove the key.
+      payload.aadhar_number = payload.aadhar_number ? String(payload.aadhar_number).replace(/\s+/g, '') : undefined;
+      if (payload.aadhar_number && !/^[2-9]\d{11}$/.test(payload.aadhar_number)) {
+        setError('Invalid Aadhaar number. Please correct it.');
+        return;
+      }
+
       const response = await axios.post(
-        "http://localhost:8000/api/v1/users/teachers",
-        formData,
+        `${API_BASE_URL}/api/v1/users/teachers`,
+        payload,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -57,16 +88,16 @@ const AddUser = () => {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20">
       {/* Animated background blobs */}
-      <div className="absolute top-0 -left-40 w-[600px] h-[500px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float" />
-      <div className="absolute -bottom-32 right-40 w-[600px] h-[600px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000" />
-      <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000" />
-      <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#3730a3] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000" />
+      <div className="absolute top-0 -left-40 w-[600px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float" />
+      <div className="absolute -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000" />
+      <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000" />
+      <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000" />
 
       {/* Back Button */}
       <div className="absolute top-6 left-6 z-50">
         <button
           onClick={() => navigate('/headmaster')}
-          className="px-6 py-3 bg-[#6366f1] text-white rounded-xl hover:bg-[#4f46e5] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
+          className="px-6 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#C8742F] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -160,10 +191,33 @@ const AddUser = () => {
               />
             </div>
             
+            <input type="hidden" name="role" value={formData.role} />
+            <div className="space-y-2 w-full">
+              <label 
+                htmlFor="aadhar" 
+                className="block text-sm font-medium text-[#170F49] ml-4"
+              >
+                Aadhaar Number (optional)
+              </label>
+              <input
+                id="aadhar"
+                name="aadhar_number"
+                type="text"
+                inputMode="numeric"
+                pattern="\d{4}\s?\d{4}\s?\d{4}"
+                maxLength={14}
+                value={formData.aadhar_number}
+                onChange={handleChange}
+                placeholder="1234 5678 9012"
+                className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
+              />
+              {aadharError && <p className="text-red-500 text-xs mt-1">{aadharError}</p>}
+            </div>
+
             {/* Submit button */}
             <button
               type="submit"
-              className="w-full bg-[#6366f1] text-white py-4 rounded-2xl hover:bg-[#4f46e5] hover:-translate-y-1 transition-all duration-200 font-medium 
+              className="w-full bg-[#E38B52] text-white py-4 rounded-2xl hover:bg-[#C8742F] hover:-translate-y-1 transition-all duration-200 font-medium 
               shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
             >
               Create Teacher User

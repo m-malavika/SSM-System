@@ -1,16 +1,23 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, desc
 from typing import List, Optional, Dict, Any, Union
 from datetime import date
 
 from app.models.student import Student
+from app.models.user import UserRole
 from app.schemas.student import StudentCreate, StudentUpdate
+from app.schemas.user import UserCreate
 from app.crud.base import CRUDBase
+from app.crud.user import user as crud_user
 from app.utils.date_utils import get_today, generate_id_with_year_prefix
 
 class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
     def get_by_admission_number(self, db: Session, *, admission_number: str) -> Optional[Student]:
         return db.query(Student).filter(Student.admission_number == admission_number).first()
+    
+    def get_by_student_id(self, db: Session, *, student_id: str) -> Optional[Student]:
+        """Get student by their string student_id (e.g., 'STU2025001')"""
+        return db.query(Student).filter(Student.student_id == student_id).first()
         
     def get_filtered(
         self, 
@@ -37,21 +44,70 @@ class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
         return query.offset(skip).limit(limit).all()
     
     def create(self, db: Session, *, obj_in: StudentCreate) -> Student:
-        # Generate student_id
-        count = db.query(Student).count()
-        student_id = generate_id_with_year_prefix("STU", count + 1)
+        """
+        Create a new student with a reliable, unique student_id.
+        Also automatically creates a user account for the student.
+        """
+        # Find the last student created by looking for the highest primary key 'id'
+        last_student = db.query(self.model).order_by(desc(self.model.id)).first()
+        
+        if last_student:
+            # If a student exists, increment their primary key 'id' by 1 for the new ID
+            next_id_num = last_student.id + 1
+        else:
+            # If the table is empty, start the count at 1
+            next_id_num = 1
+        
+        # Generate the unique student_id using the reliable next number
+        student_id = generate_id_with_year_prefix("STU", next_id_num)
         
         obj_in_data = obj_in.model_dump()
         today = get_today()
-        db_obj = Student(
+        db_obj = self.model(
+            **obj_in_data,
             student_id=student_id,
             created_at=today,
-            updated_at=today,
-            **obj_in_data
+            updated_at=today
         )
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
+        
+        # Automatically create a user account for the student
+        # Username: student_id, Password: date of birth in DDMMYYYY format
+        if db_obj.dob:
+            password = db_obj.dob.strftime("%d%m%Y")
+        else:
+            # Fallback password if DOB is not provided
+            password = "defaultpassword123"
+        
+        # Use a unique email per student user to avoid duplicate email errors
+        # Always use student_id-based email for the user account
+        email = f"{student_id.lower()}@student.local"
+        
+        # Check if user already exists (in case of re-runs)
+        existing_user = crud_user.get_by_username(db, username=student_id)
+        if not existing_user:
+            # Also check if the email is already taken, and make it unique if needed
+            existing_email_user = crud_user.get_by_email(db, email=email)
+            if existing_email_user:
+                email = f"{student_id.lower()}.{db_obj.id}@student.local"
+            
+            try:
+                user_in = UserCreate(
+                    username=student_id,
+                    email=email,
+                    password=password,
+                    role=UserRole.STUDENT,
+                    is_active=True,
+                    is_superuser=False
+                )
+                crud_user.create(db, obj_in=user_in)
+            except Exception as e:
+                # Log but don't fail student creation if user creation fails
+                import logging
+                logging.error(f"Failed to create user account for student {student_id}: {e}")
+        
         return db_obj
     
     def update(
@@ -70,4 +126,17 @@ class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
         
         return super().update(db, db_obj=db_obj, obj_in=update_data)
 
-student = CRUDStudent(Student) 
+    def update_case_record(
+        self,
+        db: Session,
+        *,
+        db_obj: Student,
+        case_record: Dict[str, Any]
+    ) -> Student:
+        update_data: Dict[str, Any] = {
+            "case_record": case_record,
+            "updated_at": get_today(),
+        }
+        return super().update(db, db_obj=db_obj, obj_in=update_data)
+
+student = CRUDStudent(Student)

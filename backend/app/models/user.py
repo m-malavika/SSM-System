@@ -3,8 +3,10 @@ from app.db.base_class import Base
 import enum
 
 class UserRole(str, enum.Enum):
-    ADMIN = "admin"
+    ADMIN = "ADMIN"
     TEACHER = "teacher"
+    THERAPIST = "therapist"
+    STUDENT = "student"
 
 class User(Base):
     __tablename__ = "users"
@@ -15,4 +17,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
-    role = Column(String, default=UserRole.TEACHER) 
+    role = Column(String, default=UserRole.ADMIN) 

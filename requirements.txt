@@ -1,0 +1,37 @@
+# FastAPI and ASGI server
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt<4.0.0
+python-multipart>=0.0.5
+email-validator>=1.1.3
+
+# Utilities
+python-dotenv==1.0.0
+pydantic[email]==2.4.2
+pydantic-settings==2.0.3
+requests==2.31.0
+huggingface-hub==0.24.6
+
+# Testing
+pytest==7.4.3
+httpx==0.25.1 
+
+# OCR and Image Processing
+Pillow==9.5.0
+opencv-python-headless==4.8.1.78
+numpy==1.23.5
+
+# Translation - IndicTrans2
+transformers>=4.35.0
+torch>=2.0.0
+sentencepiece>=0.1.99
+sacremoses>=0.0.53 
