@@ -108,7 +108,7 @@ const LoginPage = () => {
           
           {/* Info text */}
           <p className="text-[#6F6C8F] text-xs text-center mt-6">
-            No account? Contact administrator to manage access.
+            No axxxccount? Contact administrator to manage access.
           </p>
         </div>
       </div>
