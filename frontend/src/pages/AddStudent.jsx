@@ -547,16 +547,38 @@ const saveStudent = async () => {
     income: r.income 
   })),
     };
-    
-    if (!payload.dob) delete payload.dob;
-    if (!payload.admission_date) delete payload.admission_date;
-    if (payload.age) payload.age = parseInt(payload.age, 10) || null;
+    // Normalize typed fields and strip empty values so optional backend fields do not fail validation.
+    if (payload.age !== undefined && payload.age !== null && String(payload.age).trim() !== '') {
+      payload.age = parseInt(payload.age, 10) || null;
+    } else {
+      delete payload.age;
+    }
+
+    if (payload.disability_percentage !== undefined && payload.disability_percentage !== null && String(payload.disability_percentage).trim() !== '') {
+      payload.disability_percentage = parseFloat(payload.disability_percentage) || null;
+    } else {
+      delete payload.disability_percentage;
+    }
+
     if (payload.total_family_income) {
-  payload.total_family_income = String(payload.total_family_income);
-} else {
-  payload.total_family_income = null;
-}
-    if (payload.disability_percentage) payload.disability_percentage = parseFloat(payload.disability_percentage) || null;
+      payload.total_family_income = String(payload.total_family_income);
+    } else {
+      delete payload.total_family_income;
+    }
+
+    // Remove empty row placeholders from dynamic tables.
+    payload.drug_history = (payload.drug_history || []).filter((r) => (r.name && String(r.name).trim()) || (r.dose && String(r.dose).trim()));
+    payload.household = (payload.household || []).filter((r) => Object.values(r).some((v) => v !== null && v !== undefined && String(v).trim() !== ''));
+    if (!payload.drug_history.length) delete payload.drug_history;
+    if (!payload.household.length) delete payload.household;
+
+    // Drop empty strings/nulls from payload, but keep booleans.
+    Object.keys(payload).forEach((key) => {
+      const value = payload[key];
+      if (value === '' || value === null || value === undefined) {
+        delete payload[key];
+      }
+    });
     
     const endpoint = savedStudent?.id
       ? `${baseUrl}/api/v1/students/${savedStudent.id}`
@@ -1052,22 +1074,28 @@ const developmentHistoryMap = {
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Date of Birth</label>
                       <input
-                        type="date"
+                        type="text"
                         className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         id="dob"
                         value={studentForm.dob}
                         onChange={handleFieldChange('dob')}
+                        onFocus={(e) => { e.target.type = 'date'; }}
+                        onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+                        placeholder='YYYY-MM-DD'
                       />
                       {errors.dob && (<p className="text-red-500 text-xs mt-1">{errors.dob}</p>)}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">Date of Admission</label>
                       <input
-                        type="date"
+                        type="text"
                         className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         id="admission_date"
                         value={studentForm.admission_date}
                         onChange={handleFieldChange('admission_date')}
+                        onFocus={(e) => { e.target.type = 'date'; }}
+                        onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+                        placeholder='YYYY-MM-DD'
                       />
                       {errors.admission_date && (<p className="text-red-500 text-xs mt-1">{errors.admission_date}</p>)}
                     </div>
@@ -1575,10 +1603,13 @@ const developmentHistoryMap = {
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-[#170F49]">Date of Birth</label>
                       <input
-                        type="date"
+                        type="text"
                         className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                         value={studentForm.dob}
                         onChange={handleFieldChange('dob')}
+                        onFocus={(e) => { e.target.type = 'date'; }}
+                        onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+                        placeholder='YYYY-MM-DD'
                       />
                     </div>
 
@@ -2725,3 +2756,6 @@ const developmentHistoryMap = {
 };
 
 export default AddStudent;
+
+
+

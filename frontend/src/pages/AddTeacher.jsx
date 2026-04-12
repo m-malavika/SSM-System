@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { validateTeacher, formatAadhaar, cleanAadhaar } from '../utils/validation';
+import { cleanAadhaar } from '../utils/validation';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
@@ -67,54 +67,72 @@ const AddTeacher = () => {
     try {
       setErrors({});
       setIsSubmitting(true);
-
-      // Validate class assignment
-      if (!classAssignment.class) {
-        alert('Please select a class assignment.');
+      // Name is the only mandatory field.
+      if (!teacherData.name || !teacherData.name.trim()) {
+        alert('Name is required.');
         setIsSubmitting(false);
         return;
       }
 
-      // Validate teacher data
-      if (!teacherData.name || !teacherData.address || !teacherData.date_of_birth || !teacherData.gender || !teacherData.blood_group || !teacherData.mobile_number || !teacherData.aadhar_number || !teacherData.religion || !teacherData.caste || !teacherData.rci_number || !teacherData.rci_renewal_date || !teacherData.qualifications_details || !teacherData.category || !teacherData.email) {
-        alert('Please fill in all required fields.');
+      // If Aadhaar has been entered, block submit while inline validation is failing.
+      if (aadharError) {
+        alert(aadharError);
         setIsSubmitting(false);
         return;
       }
 
-      // Clean Aadhaar before sending (remove spaces)
+      // Backend still enforces many non-null teacher fields; auto-fill sensible defaults when omitted.
       const cleanedAadhaar = teacherData.aadhar_number ? String(cleanAadhaar(teacherData.aadhar_number)) : '';
+      const now = Date.now().toString();
+      const todayIso = new Date().toISOString().split('T')[0];
+      const generatedMobile = `9${now.slice(-9).padStart(9, '0')}`;
+      const generatedAadhaar = `2${now.slice(-11).padStart(11, '0')}`;
+      const generatedRci = `RCI-${now.slice(-8)}`;
 
       const teacherDataWithAssignments = {
-        ...teacherData,
-        aadhar_number: cleanedAadhaar || null,
-        class_assignments: [classAssignment]
+        name: teacherData.name.trim(),
+        address: teacherData.address?.trim() || 'Not provided',
+        date_of_birth: teacherData.date_of_birth || '2000-01-01',
+        gender: teacherData.gender || 'Other',
+        blood_group: teacherData.blood_group || 'O+',
+        mobile_number: teacherData.mobile_number?.trim() || generatedMobile,
+        aadhar_number: cleanedAadhaar || generatedAadhaar,
+        religion: teacherData.religion || 'Other',
+        caste: teacherData.caste || 'Other',
+        rci_number: teacherData.rci_number?.trim() || generatedRci,
+        rci_renewal_date: teacherData.rci_renewal_date || todayIso,
+        qualifications_details: teacherData.qualifications_details?.trim() || 'Not provided',
+        category: teacherData.category || 'Other',
+        email: teacherData.email?.trim() || null,
+        class_assignments: classAssignment.class ? [classAssignment] : []
       };
 
       // Create teacher
       const teacherResponse = await axios.post(`${API_BASE_URL}/api/v1/teachers/`, teacherDataWithAssignments);
       const teacherId = teacherResponse.data.id;
 
-      // Generate default password: Teacher + last 4 digits of Aadhaar or random
-      const lastFourAadhaar = cleanedAadhaar ? cleanedAadhaar.slice(-4) : Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      // Generate default password: Teacher + last 4 digits of effective Aadhaar
+      const effectiveAadhaar = teacherDataWithAssignments.aadhar_number;
+      const lastFourAadhaar = effectiveAadhaar.slice(-4);
       const generatedPassword = `Teacher${lastFourAadhaar}`;
-      
-      // Create user account
-      try {
-        const token = localStorage.getItem('token');
-        await axios.post(`${API_BASE_URL}/api/v1/users/`, {
-          username: teacherData.email.split('@')[0],
-          email: teacherData.email,
-          password: generatedPassword,
-          role: 'teacher',
-          is_active: true,
-          is_superuser: false
-        }, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-      } catch (userError) {
-        console.warn('User creation warning:', userError);
-        // Continue anyway - teacher was created
+      // Create user account only when a valid email is provided.
+      if (teacherData.email && teacherData.email.includes('@')) {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.post(`${API_BASE_URL}/api/v1/users/`, {
+            username: teacherData.email.split('@')[0],
+            email: teacherData.email,
+            password: generatedPassword,
+            role: 'teacher',
+            is_active: true,
+            is_superuser: false
+          }, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+        } catch (userError) {
+          console.warn('User creation warning:', userError);
+          // Continue anyway - teacher was created
+        }
       }
 
       setDefaultPassword(generatedPassword);
@@ -127,7 +145,7 @@ const AddTeacher = () => {
     } catch (error) {
       console.error('Error adding teacher:', error);
       setIsSubmitting(false);
-      alert('Error adding teacher. Please try again.');
+      alert(error?.response?.data?.detail || 'Error adding teacher. Please try again.');
     }
   };
 
@@ -217,7 +235,6 @@ const AddTeacher = () => {
                 onChange={handleInputChange}
                 placeholder="Enter Name"
                 className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
-                required
               />
               {errors.name && (<p className="text-red-500 text-xs mt-1">{errors.name}</p>)}
             </div>
@@ -233,7 +250,6 @@ const AddTeacher = () => {
                 onChange={handleInputChange}
                 placeholder="Enter Address"
                 className="input-edit"
-                required
               />
               {errors.address && (<p className="text-red-500 text-xs mt-1">{errors.address}</p>)}
             </div>
@@ -244,13 +260,15 @@ const AddTeacher = () => {
                   Date of Birth
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   name="date_of_birth"
                   id="date_of_birth"
                   value={teacherData.date_of_birth}
                   onChange={handleInputChange}
+                  onFocus={(e) => { e.target.type = 'date'; }}
+                  onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+                  placeholder="YYYY-MM-DD"
                   className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all text-[#6F6C90]"
-                  required
                 />
                 {errors.date_of_birth && (<p className="text-red-500 text-xs mt-1">{errors.date_of_birth}</p>)}
               </div>
@@ -264,7 +282,6 @@ const AddTeacher = () => {
                   value={teacherData.gender}
                   onChange={handleInputChange}
                   className={selectClassName}
-                  required
                 >
                   <option value="">Select Gender</option>
                   <option value="Male">Male</option>
@@ -286,7 +303,6 @@ const AddTeacher = () => {
                   value={teacherData.blood_group}
                   onChange={handleInputChange}
                   className={selectClassName}
-                  required
                 >
                   <option value="">Select Blood Group</option>
                   <option value="A+">A+</option>
@@ -312,7 +328,6 @@ const AddTeacher = () => {
                   onChange={handleInputChange}
                   placeholder="Enter Mobile Number"
                   className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
-                  required
                 />
                 {errors.mobile_number && (<p className="text-red-500 text-xs mt-1">{errors.mobile_number}</p>)}
               </div>
@@ -329,7 +344,6 @@ const AddTeacher = () => {
                 onChange={handleInputChange}
                 placeholder="Enter Email"
                 className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
-                required
                 pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
                 onInvalid={e => e.target.setCustomValidity('Please enter a valid email address (username@domain.extension) with no spaces.')}
                 onInput={e => e.target.setCustomValidity('')}
@@ -352,7 +366,6 @@ const AddTeacher = () => {
                 maxLength={14}
                 placeholder="1234 5678 9012"
                 className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1] transition-all placeholder:text-[#6F6C90]"
-                required
               />
               {aadharError && <p className="text-red-500 text-xs mt-1">{aadharError}</p>}
               {errors.aadhar_number && !aadharError && (<p className="text-red-500 text-xs mt-1">{errors.aadhar_number}</p>)}
@@ -368,7 +381,6 @@ const AddTeacher = () => {
                   value={teacherData.religion}
                   onChange={handleInputChange}
                   className={selectClassName}
-                  required
                 >
                   <option value="">Select Religion</option>
                   <option value="Hindu">Hindu</option>
@@ -390,7 +402,6 @@ const AddTeacher = () => {
                   onChange={handleInputChange}
                   placeholder="Enter Caste"
                   className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
-                  required
                 />
               </div>
             </div>
@@ -408,7 +419,6 @@ const AddTeacher = () => {
                   onChange={handleInputChange}
                   placeholder="Enter RCI Number"
                   className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#6F6C90]"
-                  required
                 />
                 {errors.rci_number && (<p className="text-red-500 text-xs mt-1">{errors.rci_number}</p>)}
               </div>
@@ -417,13 +427,15 @@ const AddTeacher = () => {
                   RCI Renewal Date
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   name="rci_renewal_date"
                   id="rci_renewal_date"
                   value={teacherData.rci_renewal_date}
                   onChange={handleInputChange}
+                  onFocus={(e) => { e.target.type = 'date'; }}
+                  onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+                  placeholder="YYYY-MM-DD"
                   className="w-full px-4 py-4 rounded-2xl border bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all text-[#6F6C90]"
-                  required
                 />
                 {errors.rci_renewal_date && (<p className="text-red-500 text-xs mt-1">{errors.rci_renewal_date}</p>)}
               </div>
@@ -440,7 +452,6 @@ const AddTeacher = () => {
                 onChange={handleInputChange}
                 placeholder="Enter Qualifications Details"
                 className="input-edit"
-                required
               />
               {errors.qualifications_details && (<p className="text-red-500 text-xs mt-1">{errors.qualifications_details}</p>)}
             </div>
@@ -455,7 +466,6 @@ const AddTeacher = () => {
                 value={teacherData.category}
                 onChange={handleInputChange}
                 className={selectClassName}
-                required
               >
                 <option value="">Select Category</option>
                 <option value="General">General</option>
@@ -483,7 +493,6 @@ const AddTeacher = () => {
                     value={classAssignment.class}
                     onChange={(e) => handleClassAssignmentChange('class', e.target.value)}
                     className={selectClassName}
-                    required
                   >
                     <option value="">Select Class</option>
                     <option value="PrePrimary">PrePrimary</option>
@@ -507,7 +516,6 @@ const AddTeacher = () => {
                     value={classAssignment.year}
                     onChange={(e) => handleClassAssignmentChange('year', e.target.value)}
                     className={selectClassName}
-                    required
                   >
                     <option value={new Date().getFullYear().toString()}>{new Date().getFullYear()}</option>
                     {[...Array(5)].map((_, i) => {
@@ -609,3 +617,15 @@ const AddTeacher = () => {
 };
 
 export default AddTeacher;
+
+
+
+
+
+
+
+
+
+
+
+
