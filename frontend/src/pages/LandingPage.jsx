@@ -85,7 +85,7 @@ const LandingPage = () => {
         <div className="relative z-10 text-center max-w-3xl px-4"> {/* Increased max-width slightly */}
           {/* Main Heading */}
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-[#B3541E] mb-6 font-baskervville leading-tight"> {/* Improved contrast for hero title */}
-            Hello  Every Child Matters,<br/>Every Moment Counts.
+            Every Child Matters,<br/>Every Moment Counts.
           </h2>
           {/* Subtitle */}
           <p className="text-lg sm:text-xl text-[#A86A3D] leading-relaxed"> {/* Adjusted size and color for palette harmony */}
